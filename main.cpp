@@ -31,27 +31,32 @@ int main()
         {
             
             //if inc1 has changed, but inc2 is different to inc1... counter clockwise. 
-            if ( inc2 != inc1  )
+            if (inc1_prev == 0 && inc1 == 1)    //specifically rising edge
             {
+                if (inc2 == 0)
+                {
                 //clockwise rotation
                 led = 1;
                 wait_us(5000);
                 counter++;
                 led = 0;
-            }
-            else {
-                
+                }
+                else
+                {
                 led_ext = 1;
                 wait_us(5000);
                 counter++;
                 led_ext = 0;
+                }
             }
-
             fprintf(mypcFile, "The encoder count is %d. The previous value of encoder A is %d \n", counter, inc1_prev); 
 
         }
        
         inc1_prev = inc1;
+        
+        //Debounce
+        wait_us(500);
 
     }
 }
