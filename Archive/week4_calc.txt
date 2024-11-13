@@ -1,0 +1,84 @@
+#include "mbed.h"
+#include <stdio.h>
+
+
+BufferedSerial serial_port(USBTX, USBRX, 9600);
+
+DigitalIn inc1(PA_1);
+DigitalIn inc2(PA_4);
+
+int calculate(int value1, char operation, int value2)
+{
+
+    switch(operation)
+    {
+
+        case '+':
+        
+            return value1 + value2;
+
+        default: 
+            serial_port.write("error", 10);
+            return 0;
+    
+    }
+
+}
+
+
+int counter;
+
+Timer timer;
+
+
+// main() runs in its own thread in the OS
+int main()
+{
+
+
+    counter = 0;
+
+
+    while(true)
+    {
+
+        int value1 = inc1;
+        int value2 = inc2;
+
+        timer.reset();
+        timer.start();
+
+
+        if ( (!inc1) || (!inc2))
+        {
+            counter++;
+        }
+
+
+        // Perform arithmetic operations in a loop
+        int result = 0;
+        for (int i = 0; i < 1000; i++) {
+            result += calculate(value1, '+', value2);
+        }
+
+        timer.stop();
+        int elapsed_time_us =  timer.read_us();
+
+         // Display the result and elapsed time on the serial monitor
+        char buffer[100];
+        sprintf(buffer, "Result: %d, Elapsed time: %d us\n", counter, elapsed_time_us);
+        serial_port.write(buffer, strlen(buffer));        
+
+
+
+        
+        
+        wait_us(1000000);
+
+
+
+
+    }
+
+
+}
