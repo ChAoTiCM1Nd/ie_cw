@@ -1,21 +1,29 @@
 #include "mbed.h"
 #include <stdio.h>
-#include <cstdint>
 
 DigitalOut led(LED1);
-PwmOut fan(PB_0);               // PWM control for the fan
-InterruptIn fan_tacho(PA_0);    // Tachometer input to count pulses
-InterruptIn encoderA(PA_1);     // Rotary encoder channel A
-InterruptIn encoderB(PA_2);     // Rotary encoder channel B
-BufferedSerial mypc(USBTX, USBRX);
+DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
+PwmOut fan(PB_0);                   // PWM control for the fan
+InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
+DigitalIn inc1(PA_1);               // Rotary encoder channel A
+DigitalIn inc2(PA_4);               // Rotary encoder channel B
+BufferedSerial mypc(USBTX, USBRX, 115200);
 
-const int max_rpm = 3480;       // Maximum fan RPM at 100% duty cycle
-volatile int pulse_count = 0;   // Counts tachometer pulses
-volatile int fan_speed = 50;    // Initial fan speed (50% duty cycle)
+const int max_rpm = 3480;           // Maximum fan RPM at 100% duty cycle
+volatile int pulse_count = 0;       // Counts tachometer pulses
+volatile int target_rpm = 1740;     // Initial target RPM (50% of max RPM)
+int inc1_prev = 0;                  // Previous state of inc1 for edge detection
 
-// Debounce variables
-Timer debounce_timer;
-volatile bool debounce = false;
+// Function to update fan speed based on target RPM
+void update_fan_speed() {
+    // Constrain the target RPM to a safe range
+    if (target_rpm < 0) target_rpm = 0;
+    if (target_rpm > max_rpm) target_rpm = max_rpm;
+
+    // Calculate and set PWM duty cycle based on target RPM
+    float duty_cycle = static_cast<float>(target_rpm) / max_rpm;
+    fan.write(duty_cycle);
+}
 
 // Interrupt service routine to count tachometer pulses
 void count_pulse() {
@@ -23,66 +31,67 @@ void count_pulse() {
     led = !led;
 }
 
-// Interrupt service routine for rotary encoder
-void encoder_interrupt() {
-    // Check debounce status
-    if (debounce) return;
-    debounce = true;
-    debounce_timer.reset();
-
-    // Determine rotation direction
-    if (encoderA.read() != encoderB.read()) {
-        fan_speed += 5;  // Increase speed
-    } else {
-        fan_speed -= 5;  // Decrease speed
-    }
-
-    // Constrain fan speed between 0 and 100%
-    if (fan_speed < 0) fan_speed = 0;
-    if (fan_speed > 100) fan_speed = 100;
-
-    // Update PWM duty cycle
-    fan.write(fan_speed / 100.0f);
-}
-
 // Main program
 int main() {
-    FILE* mypcFile = fdopen(&mypc, "r+");
+    mypc.set_format(8, BufferedSerial::None, 1); // Set serial format
+    printf("Starting fan control with encoder\n");
 
     // Initialize PWM for the fan
     fan.period(0.00002f);    // Set period for 25 kHz PWM (adjust for your fan specs)
-    fan.write(fan_speed / 100.0f);   // Set initial duty cycle based on fan_speed
+    update_fan_speed();      // Set initial duty cycle based on target RPM
 
-    // Attach interrupts for the tachometer and encoder channels
-    fan_tacho.rise(&count_pulse);    // Count rising edges
-    encoderA.rise(&encoder_interrupt);
-    encoderB.rise(&encoder_interrupt);
+    // Attach interrupt for the tachometer
+    fan_tacho.rise(&count_pulse); // Count rising edges
 
-    // Start debounce timer
-    debounce_timer.start();
+    Timer rpm_timer;
+    rpm_timer.start();
 
     while (true) {
-        // Capture pulse count over 1 second
-        {
-            CriticalSectionLock lock; // Ensure atomic access
-            pulse_count = 0;
+        // Rotary encoder logic
+        if (inc1.read() != inc1_prev) {
+            if (inc1_prev == 0 && inc1.read() == 1) {    // Rising edge of inc1
+                if (inc2.read() == 0) {
+                    // Clockwise rotation: increase target RPM
+                    led = 1;
+                    target_rpm += 100;  // Increase target RPM by 100
+                    led = 0;
+                } else {
+                    // Counterclockwise rotation: decrease target RPM
+                    led_ext = 1;
+                    target_rpm -= 100;  // Decrease target RPM by 100
+                    led_ext = 0;
+                }
+
+                // Update fan speed based on the new target RPM
+                update_fan_speed();
+
+                // Output the encoder count and target RPM to serial
+                printf("The encoder count is %d. Target RPM: %d\n", target_rpm / 100, target_rpm);
+            }
         }
-        thread_sleep_for(1000); // Measure for 1 second
 
-        // Calculate RPM: (pulse_count / 2) * 60 for a 2-pulse per revolution fan
-        int rpm;
-        {
-            CriticalSectionLock lock; // Ensure atomic access
-            rpm = (pulse_count / 2) * 60;
-        }
+        inc1_prev = inc1.read(); // Update previous state
 
-        // Calculate and output fan RPM as a percentage of max RPM
-        int speed_rpm = (fan_speed * max_rpm) / 100;   // Map fan_speed to RPM
-        fprintf(mypcFile, "Fan RPM: %d (approx %d%% of max)\n", rpm, fan_speed);
+        // Debounce
+        wait_us(500);
 
-        // Debounce delay check
-        if (debounce && debounce_timer.elapsed_time().count() > 50) { // 50 ms debounce
-            debounce = false;
+        // Calculate RPM once per second
+        if (rpm_timer.elapsed_time().count() >= 1000000) { // 1 second elapsed
+            rpm_timer.reset();
+
+            // Calculate RPM: (pulse_count / 2) * 60 for a 2-pulse per revolution fan
+            int rpm;
+            {
+                CriticalSectionLock lock; // Ensure atomic access
+                rpm = (pulse_count / 2) * 60;
+                pulse_count = 0; // Reset pulse count after reading
+            }
+
+            // Output current RPM and target RPM to serial
+            printf("Fan RPM: %d, Target RPM: %d\n", rpm, target_rpm);
+
+            // Ensure fan PWM is updated in case of any drift
+            update_fan_speed();
         }
     }
 }
