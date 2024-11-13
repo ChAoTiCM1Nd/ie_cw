@@ -9,20 +9,25 @@ DigitalIn inc1(PA_1);               // Rotary encoder channel A
 DigitalIn inc2(PA_4);               // Rotary encoder channel B
 BufferedSerial mypc(USBTX, USBRX, 115200);
 
-const int max_rpm = 3480;           // Maximum fan RPM at 100% duty cycle
+const int max_rpm = 3600;           // Maximum fan RPM for 100% duty cycle (adjusted)
 volatile int pulse_count = 0;       // Counts tachometer pulses
 volatile int target_rpm = 1740;     // Initial target RPM (50% of max RPM)
 int inc1_prev = 0;                  // Previous state of inc1 for edge detection
+float current_duty_cycle = 0.5;     // Initial duty cycle set to 50%
 
 // Function to update fan speed based on target RPM
 void update_fan_speed() {
-    // Constrain the target RPM to a safe range
+    // Constrain the target RPM to a safe range (0 to 3600 RPM)
     if (target_rpm < 0) target_rpm = 0;
     if (target_rpm > max_rpm) target_rpm = max_rpm;
 
     // Calculate and set PWM duty cycle based on target RPM
+    // Map target RPM from 0 to 3600 RPM to a duty cycle from 0% to 100%
     float duty_cycle = static_cast<float>(target_rpm) / max_rpm;
     fan.write(duty_cycle);
+
+    // Print the current duty cycle to the command window
+    printf("Current duty cycle: %.2f (Target RPM: %d)\n", duty_cycle, target_rpm);
 }
 
 // Interrupt service routine to count tachometer pulses
@@ -90,8 +95,22 @@ int main() {
             // Output current RPM and target RPM to serial
             printf("Fan RPM: %d, Target RPM: %d\n", rpm, target_rpm);
 
-            // Ensure fan PWM is updated in case of any drift
-            update_fan_speed();
+            // Adjust duty cycle if the RPM is not equal to the target RPM
+            if (rpm < target_rpm) {
+                // If the actual RPM is less than the target, increase the duty cycle
+                current_duty_cycle += 0.05; // Increase duty cycle by 5%
+                if (current_duty_cycle > 1.0) current_duty_cycle = 1.0; // Cap the duty cycle to 100%
+            } else if (rpm > target_rpm) {
+                // If the actual RPM is greater than the target, decrease the duty cycle
+                current_duty_cycle -= 0.05; // Decrease duty cycle by 5%
+                if (current_duty_cycle < 0.0) current_duty_cycle = 0.0; // Cap the duty cycle to 0%
+            }
+
+            // Set the adjusted duty cycle to the fan
+            fan.write(current_duty_cycle);
+
+            // Output the adjusted duty cycle
+            printf("Adjusted Duty Cycle: %.2f\n", current_duty_cycle);
         }
     }
 }
