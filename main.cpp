@@ -12,30 +12,17 @@
 #include <cstdint>
 
 
-PwmOut led(LED1);
 PwmOut fan(PB_0);
 InterruptIn fan_taco(PA_0);
-
-
-
 
 // Bufferial serial
 BufferedSerial mypc (USBTX, USBRX);
 
-
-//temporary register to access temperature data 
-char TEMP_REG = 0x00;
-
 volatile int pulse_count;
-
 
 void count_pulse()
 {
-
     pulse_count++;
-
-
-
 }
 
 int main()
@@ -47,24 +34,16 @@ int main()
 
     fprintf(mypcFile,"Starting....\n\n");
 
+    fprintf(mypcFile,"\033[0m\033[2J\033[HI2C Searching!\n\n\n"); 
 
-    char data[2];
-
-    led.period(2.0f);
-    led.write(0.25f);
-
-    fan.period(0.0f);
-    fan.write(0.0f);
+    fan.period(0.1f);
+    fan.write(0.9f);
 
     //fan_taco.rise(&count_pulse());
 
     while (true)
     {
 
-        
-       
-       //fprintf(mypcFile,"Taco Signal is: %d \n",fan_taco );
-        
             
 
     }
