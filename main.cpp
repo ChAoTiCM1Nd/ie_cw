@@ -19,7 +19,7 @@ InterruptIn fan_taco(PA_0);
 
 
 
-
+// Bufferial serial
 BufferedSerial mypc (USBTX, USBRX);
 
 
