@@ -1,0 +1,32 @@
+#include "mbed.h"
+
+
+
+BufferedSerial serial_port(USBTX, USBRX, 9600);
+DigitalOut led(LED1);
+
+DigitalIn inc1(PA_1);
+DigitalIn inc2(PA_4);
+
+// main() runs in its own thread in the OS
+int main()
+{
+
+    serial_port.write("Integrated counter: \n", 43);
+    for(int count=0; count<=120; count++)
+    {
+        char buffer[32];
+
+        int len = snprintf(buffer, sizeof(buffer), "%d seconds\n", count);
+
+        serial_port.write(buffer, len);
+        led = !led;
+
+        
+        wait_us(1000000);
+
+    }
+
+
+}
+

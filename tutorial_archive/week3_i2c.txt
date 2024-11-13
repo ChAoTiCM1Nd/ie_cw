@@ -1,0 +1,47 @@
+#include "mbed.h"
+
+
+
+DigitalOut led(LED1);
+DigitalIn button(BUTTON1);
+
+
+BufferedSerial serial_port(USBTX, USBRX, 9600);
+I2C i2c(I2C_SDA, I2C_SCL);
+
+
+// Define the TC74A5-5.0 sensor's I2C address
+const int TC74A5_ADDR = 0x48 << 1;  // Shift the address by 1 bit for Mbed
+
+// main() runs in its own thread in the OS
+int main()
+{
+
+
+    button.mode(PullUp);
+
+
+    while (true) {
+
+        char data[1];
+
+        i2c.write(TC74A5_ADDR, data, 0);
+
+        wait_us(2000000);
+
+        i2c.read(TC74A5_ADDR, data, 1);
+
+        //printf("Temperature: %d \n", data[0]
+        //);
+
+        //wait_us(20000);
+
+        float temperature = (float)data[0];
+
+        printf("Float Temperature: %d \n", temperature);
+
+        //wait_us(2000000);
+
+    }
+}
+
