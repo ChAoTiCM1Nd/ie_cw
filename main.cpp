@@ -100,11 +100,12 @@ int main() {
             // Adjust duty cycle if the RPM is not equal to the target RPM
             if (rpm < target_rpm) {
                 // If the actual RPM is less than the target, increase the duty cycle
-                current_duty_cycle += 0.05; // Increase duty cycle by 5%
+                current_duty_cycle += 0.0025; // Increase duty cycle by 5%
                 if (current_duty_cycle > 1.0) current_duty_cycle = 1.0; // Cap the duty cycle to 100%
             } else if (rpm > target_rpm) {
                 // If the actual RPM is greater than the target, decrease the duty cycle
-                current_duty_cycle -= 0.05; // Decrease duty cycle by 5%
+                current_duty_cycle -= 0.0025; // Decrease duty cycle by 5%
+                printf("RPM is greater than target rpm. Must reduce speed.\n");
                 if (current_duty_cycle < 0.0) current_duty_cycle = 0.0; // Cap the duty cycle to 0%
             }
 
