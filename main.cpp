@@ -1,74 +1,65 @@
-/* mbed Microcontroller Library
- * Copyright (c) 2019 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
- */
-
-
-
-//      Note: The code below is to control the PWM fan in a basic fashion. 
-
 #include "mbed.h"
 #include <stdio.h>
 #include <cstdint>
 
+// PWM pins and interrupt input
+PwmOut led(LED1);           // Control for the onboard LED
+PwmOut fan(PB_0);           // PWM control for the fan
+InterruptIn fan_taco(PA_0); // Tachometer signal from the fan
 
-PwmOut led(LED1);
-PwmOut fan(PB_0);
-InterruptIn fan_taco(PA_0);
+// Serial communication for debugging
+BufferedSerial mypc(USBTX, USBRX);
 
+// Global variables
+volatile int pulse_count = 0;
+int rpm = 0;  // Fan speed in RPM
 
-
-
-
-BufferedSerial mypc (USBTX, USBRX);
-
-
-//temporary register to access temperature data 
-char TEMP_REG = 0x00;
-
-volatile int pulse_count;
-
-
-void count_pulse()
-{
-
+// Calculate RPM based on pulse count (called periodically)
+void count_pulse() {
     pulse_count++;
-
-
-
 }
 
-int main()
-{
+void calculate_rpm() {
+    // Assuming fan_taco gives 2 pulses per revolution (common for fans)
+    // You may adjust this calculation based on actual fan specs
+    rpm = (pulse_count * 60) / 2;  // Convert pulse count to RPM
+    pulse_count = 0;  // Reset pulse count for the next measurement cycle
+}
 
-    //temporary buffer for read temp
-    char temp_data; 
+int main() {
+    // Setup serial output for debugging
     FILE* mypcFile = fdopen(&mypc, "r+");
+    fprintf(mypcFile, "Starting...\n\n");
 
-    fprintf(mypcFile,"Starting....\n\n");
+    // Configure LED PWM (for indication, e.g., heartbeat LED)
+    led.period(2.0f);  // 0.5Hz blink rate
+    led.write(0.25f);  // 25% brightness
 
+    // Configure fan PWM
+    fan.period(0.02f); // Set PWM period to 50Hz for fan control (adjust if needed)
+    fan.write(0.0f);   // Initially turn off the fan
 
-    char data[2];
+    // Attach interrupt function to count pulses from the fan taco signal
+    fan_taco.rise(&count_pulse);  // Rising edge interrupt to count pulses
 
-    led.period(2.0f);
-    led.write(0.25f);
+    while (true) {
+        // Calculate RPM every second
+        ThisThread::sleep_for(1000ms);
+        calculate_rpm();
 
-    fan.period(0.0f);
-    fan.write(0.0f);
+        // Print the RPM to serial output
+        fprintf(mypcFile, "RPM: %d\n", rpm);
 
-    //fan_taco.rise(&count_pulse());
-
-    while (true)
-    {
-
-        
-       
-       //fprintf(mypcFile,"Taco Signal is: %d \n",fan_taco );
-        
-            
-
+        // Fan control logic based on RPM
+        if (rpm < 1000) {
+            // Low RPM, increase fan speed
+            fan.write(0.3f);  // Set PWM duty cycle to 30%
+        } else if (rpm < 3000) {
+            // Medium RPM, moderate fan speed
+            fan.write(0.5f);  // Set PWM duty cycle to 50%
+        } else {
+            // High RPM, fan running at maximum speed
+            fan.write(0.8f);  // Set PWM duty cycle to 80%
+        }
     }
-    
-
-    
 }
