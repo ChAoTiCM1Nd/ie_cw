@@ -2,64 +2,49 @@
 #include <stdio.h>
 #include <cstdint>
 
-// PWM pins and interrupt input
-PwmOut led(LED1);           // Control for the onboard LED
+DigitalOut led(LED1);
 PwmOut fan(PB_0);           // PWM control for the fan
-InterruptIn fan_taco(PA_0); // Tachometer signal from the fan
-
-// Serial communication for debugging
+InterruptIn fan_tacho(PA_0); // Tachometer input to count pulses
 BufferedSerial mypc(USBTX, USBRX);
 
-// Global variables
-volatile int pulse_count = 0;
-int rpm = 0;  // Fan speed in RPM
 
-// Calculate RPM based on pulse count (called periodically)
+volatile int pulse_count = 0; // Counts tachometer pulses
+
+// Interrupt service routine to count tachometer pulses
 void count_pulse() {
     pulse_count++;
-}
-
-void calculate_rpm() {
-    // Assuming fan_taco gives 2 pulses per revolution (common for fans)
-    // You may adjust this calculation based on actual fan specs
-    rpm = (pulse_count * 60) / 2;  // Convert pulse count to RPM
-    pulse_count = 0;  // Reset pulse count for the next measurement cycle
+    led = !led;
 }
 
 int main() {
-    // Setup serial output for debugging
     FILE* mypcFile = fdopen(&mypc, "r+");
-    fprintf(mypcFile, "Starting...\n\n");
 
-    // Configure LED PWM (for indication, e.g., heartbeat LED)
-    led.period(2.0f);  // 0.5Hz blink rate
-    led.write(0.25f);  // 25% brightness
+    // Initialize PWM for the fan
+    fan.period(0.00002f);   // Set period for 25 kHz PWM (adjust for your fan specs)
+    fan.write(0.5f);        // 50% duty cycle to start (adjustable)
 
-    // Configure fan PWM
-    fan.period(0.02f); // Set PWM period to 50Hz for fan control (adjust if needed)
-    fan.write(0.0f);   // Initially turn off the fan
-
-    // Attach interrupt function to count pulses from the fan taco signal
-    fan_taco.rise(&count_pulse);  // Rising edge interrupt to count pulses
+    // Attach the interrupt for the tachometer signal
+    fan_tacho.rise(&count_pulse); // Count rising edges
 
     while (true) {
-        // Calculate RPM every second
-        ThisThread::sleep_for(1000ms);
-        calculate_rpm();
+        // Capture pulse count over 1 second
 
-        // Print the RPM to serial output
-        fprintf(mypcFile, "RPM: %d\n", rpm);
 
-        // Fan control logic based on RPM
-        if (rpm < 1000) {
-            // Low RPM, increase fan speed
-            fan.write(0.3f);  // Set PWM duty cycle to 30%
-        } else if (rpm < 3000) {
-            // Medium RPM, moderate fan speed
-            fan.write(0.5f);  // Set PWM duty cycle to 50%
-        } else {
-            // High RPM, fan running at maximum speed
-            fan.write(0.8f);  // Set PWM duty cycle to 80%
+        // Clear pulse count at the start of the measurement period
+        {
+            CriticalSectionLock lock; // Ensure atomic access
+            pulse_count = 0;
         }
+        thread_sleep_for(1000); // Measure for 1 second
+
+        // Calculate RPM: (pulse_count / 2) * 60 for a 2-pulse per revolution fan
+        int rpm;
+        {
+            CriticalSectionLock lock; // Ensure atomic access
+            rpm = (pulse_count / 2) * 60;
+        }
+
+        // Output RPM to serial
+        fprintf(mypcFile, "Fan RPM: %d\n", rpm);
     }
 }
