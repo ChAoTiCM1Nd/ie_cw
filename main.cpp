@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+
+
+//      Note: The code below is to control the PWM fan in a basic fashion. 
+
 #include "mbed.h"
 #include <stdio.h>
 #include <cstdint>
