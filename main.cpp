@@ -8,7 +8,7 @@
 
 DigitalOut led(LED1);
 DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
-PwmOut fan(PB_0);                   // PWM control for the fan
+PwmOut fan(PB_0);                   /\s/ PWM control for the fan
 InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
 DigitalIn inc1(PA_1);               // Rotary encoder channel A
 DigitalIn inc2(PA_4);               // Rotary encoder channel B
@@ -23,9 +23,9 @@ int inc1_prev = 0;                  // Previous state of inc1 for edge detection
 const float integral_max = 500.0; // Adjust this limit based on tuning
 const float integral_min = -500.0;
 
-float Kp = 0.0005;
-float Ki = 0.000;
-float Kd = 0.000;
+float Kp = 0.00042;
+float Ki = 0.00006;
+float Kd = 0.00005;
 
 float current_duty_cycle = 0.0;     // Initial duty cycle set to 50%
 float prev_error = 0;
@@ -62,7 +62,7 @@ int main() {
 
     // Initialize PWM for the fan
     fan.period(0.02f);    // Set period for 25 kHz PWM (adjust for your fan specs)
-    update_fan_speed(current_duty_cycle);      // Set initial duty cycle based on target RPM
+    //update_fan_speed(current_duty_cycle);      // Set initial duty cycle based on target RPM
 
     // Attach interrupt for the tachometer
     fan_tacho.rise(&count_pulse); // Count rising edges
@@ -103,8 +103,9 @@ int main() {
         // Debounce
         wait_us(500);
 
+        float delta_t = 0.1f;
         // Calculate RPM once per second
-        if (rpm_timer.elapsed_time().count() >= 1000000) { // 1 second elapsed
+        if (rpm_timer.elapsed_time().count() >= 100000) { // 1 second elapsed
             rpm_timer.reset();
 
             // Calculate RPM: (pulse_count / 2) * 60 for a 2-pulse per revolution fan
@@ -138,20 +139,20 @@ int main() {
             printf("Adjusted Duty Cycle: %.2f\n", current_duty_cycle);
             */
             int error = target_rpm - rpm;
-            integral += error;
+            integral += error * delta_t;
             int derivative = error - prev_error;
 
             // Apply clamping to prevent windup
             if (integral > integral_max) integral = integral_max;
             if (integral < integral_min) integral = integral_min;
 
-            float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.00f);
+            float pid_output = (Kp * error) + (Ki * integral) + (Kd * 0.00f);
 
             current_duty_cycle += pid_output;
             update_fan_speed(current_duty_cycle);
 
             //printf("Fan RPM: %d, Target RPM: %d, calculated PID Output is %.2f \nIntegral: %.2f, Derivative: %d, Error: %d\n", rpm, target_rpm, pid_output, integral, derivative, error);
-            printf("Calculated duty cycle: %.2f\n", current_duty_cycle);
+            printf("Calculated duty cycle: %.2f, Fan RPM: %d, Target RPM: %d\n", current_duty_cycle, rpm, target_rpm);
 
             prev_error = error;
         }
