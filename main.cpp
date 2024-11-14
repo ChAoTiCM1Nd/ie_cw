@@ -1,7 +1,10 @@
 //https://chatgpt.com/share/6734cb16-d66c-800f-850d-4885cfd94bdc
 
 #include "mbed.h"
+#include <iterator>
 #include <stdio.h>
+
+#include "PID.h"
 
 DigitalOut led(LED1);
 DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
@@ -15,19 +18,28 @@ const int max_rpm = 3600;           // Maximum fan RPM for 100% duty cycle (adju
 volatile int pulse_count = 0;       // Counts tachometer pulses
 volatile int target_rpm = 1740;     // Initial target RPM (50% of max RPM)
 int inc1_prev = 0;                  // Previous state of inc1 for edge detection
+
+
+float Kp = 0.05;
+float Ki = 0.01;
+float Kd = 0.01;
+
 float current_duty_cycle = 0.5;     // Initial duty cycle set to 50%
+float prev_error = 0;
+float integral = 0;
 
 // Function to update fan speed based on target RPM
-void update_fan_speed() {
+void update_fan_speed(float duty_cycle) {
     // Constrain the target RPM to a safe range (0 to 3600 RPM)
-    if (target_rpm < 0) target_rpm = 0;
-    if (target_rpm > max_rpm) target_rpm = max_rpm;
-
+    //if (target_rpm < 0) target_rpm = 0;
+    //if (target_rpm > max_rpm) target_rpm = max_rpm;
+    if (duty_cycle < 0.0) duty_cycle = 0.0;
+    if (duty_cycle > 1.0) duty_cycle = 1.0;
+    fan.write(duty_cycle);
     // Calculate and set PWM duty cycle based on target RPM
     // Map target RPM from 0 to 3600 RPM to a duty cycle from 0% to 100%
-    float duty_cycle = static_cast<float>(target_rpm) / max_rpm;
-    fan.write(duty_cycle);
-
+    //float duty_cycle = static_cast<float>(target_rpm) / max_rpm;
+    //fan.write(duty_cycle);
     // Print the current duty cycle to the command window
     printf("Current duty cycle: %.2f (Target RPM: %d)\n", duty_cycle, target_rpm);
 }
@@ -45,7 +57,7 @@ int main() {
 
     // Initialize PWM for the fan
     fan.period(0.00002f);    // Set period for 25 kHz PWM (adjust for your fan specs)
-    update_fan_speed();      // Set initial duty cycle based on target RPM
+    update_fan_speed(current_duty_cycle);      // Set initial duty cycle based on target RPM
 
     // Attach interrupt for the tachometer
     fan_tacho.rise(&count_pulse); // Count rising edges
@@ -69,8 +81,12 @@ int main() {
                     led_ext = 0;
                 }
 
+                if (target_rpm > max_rpm) target_rpm = max_rpm;
+                if (target_rpm < 0) target_rpm = 0;
+
+
                 // Update fan speed based on the new target RPM
-                update_fan_speed();
+                //update_fan_speed();
 
                 // Output the encoder count and target RPM to serial
                 printf("The encoder count is %d. Target RPM: %d\n", target_rpm / 100, target_rpm);
@@ -97,6 +113,7 @@ int main() {
             // Output current RPM and target RPM to serial
             printf("Fan RPM: %d, Target RPM: %d\n", rpm, target_rpm);
 
+            /*
             // Adjust duty cycle if the RPM is not equal to the target RPM
             if (rpm < target_rpm) {
                 // If the actual RPM is less than the target, increase the duty cycle
@@ -114,6 +131,19 @@ int main() {
 
             // Output the adjusted duty cycle
             printf("Adjusted Duty Cycle: %.2f\n", current_duty_cycle);
+            */
+
+
+            int error = target_rpm - rpm;
+            integral += error;
+            int derivative = error - prev_error;
+
+            float pid_output = (Kp * error) + (Ki * integral) + (Kd * derivative);
+
+            current_duty_cycle += pid_output;
+            update_fan_speed(current_duty_cycle);
+
+            prev_error = error;
         }
     }
 }
