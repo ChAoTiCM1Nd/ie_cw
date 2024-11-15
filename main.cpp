@@ -3,30 +3,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
-
 //      Note: The code below is to control the PWM fan in a basic fashion. 
 
 #include "mbed.h"
 #include <stdio.h>
 #include <cstdint>
+#include "LCD_ST7066U.h"
+
+LCD lcd(PB_15, PB_14, PB_10, PA_8, PB_2, PB_1); // Adjust pin names as per your hardware
 
 
-PwmOut fan(PB_0);
-InterruptIn fan_taco(PA_0);
 
 // Bufferial serial
 BufferedSerial mypc (USBTX, USBRX);
 
-volatile int pulse_count;
 
-void count_pulse()
-{
-    pulse_count++;
-}
 
 int main()
 {
+
+    lcd.clear();                  // Clear the screen
+    lcd.writeLine("RPM Control", 0); // Write text to the first line
+    lcd.writeLine("Initializing...", 1); // Write text to the second line
 
     //temporary buffer for read temp
     char temp_data; 
@@ -36,14 +34,11 @@ int main()
 
     fprintf(mypcFile,"\033[0m\033[2J\033[HI2C Searching!\n\n\n"); 
 
-    fan.period(0.1f);
-    fan.write(0.9f);
 
-    //fan_taco.rise(&count_pulse());
 
     while (true)
     {
-
+        lcd.writeLine("Initializing...", 1); // Write text to the second line
             
 
     }
