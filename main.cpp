@@ -8,7 +8,7 @@
 
 DigitalOut led(LED1);
 DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
-PwmOut fan(PB_0);                   /\s/ PWM control for the fan
+PwmOut fan(PB_0);                   // PWM control for the fan
 InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
 DigitalIn inc1(PA_1);               // Rotary encoder channel A
 DigitalIn inc2(PA_4);               // Rotary encoder channel B
