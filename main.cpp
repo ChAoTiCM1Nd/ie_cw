@@ -38,7 +38,7 @@ int main()
 
     while (true)
     {
-        lcd.writeLine("Initializing...", 1); // Write text to the second line
+        lcd.writeLine("Initializing...", 0); // Write text to the second line
             
 
     }
