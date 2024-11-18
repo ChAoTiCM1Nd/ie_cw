@@ -25,7 +25,7 @@ const float integral_min = -500.0;
 
 float Kp = 0.00042;
 float Ki = 0.00006;
-float Kd = 0.00005;
+float Kd = 0.0000;
 
 float current_duty_cycle = 0.0;     // Initial duty cycle set to 50%
 float prev_error = 0;
@@ -155,6 +155,8 @@ int main() {
             printf("Calculated duty cycle: %.2f, Fan RPM: %d, Target RPM: %d\n", current_duty_cycle, rpm, target_rpm);
 
             prev_error = error;
+            wait_us(1000000);
         }
     }
 }
+
