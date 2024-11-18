@@ -4,8 +4,6 @@
 #include <iterator>
 #include <stdio.h>
 
-//#include "PID.h"
-
 DigitalOut led(LED1);
 DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
 PwmOut fan(PB_0);                   // PWM control for the fan
@@ -24,7 +22,7 @@ const float integral_max = 500.0; // Adjust this limit based on tuning
 const float integral_min = -500.0;
 
 float Kp = 0.00042;
-float Ki = 0.00006;
+float Ki = 0.00003;
 float Kd = 0.0000;
 
 float current_duty_cycle = 0.0;     // Initial duty cycle set to 50%
@@ -33,19 +31,21 @@ float integral = 0;
 
 // Function to update fan speed based on target RPM
 void update_fan_speed(float duty_cycle) {
+
+    /* Working code for open loop control!
     // Constrain the target RPM to a safe range (0 to 3600 RPM)
     //if (target_rpm < 0) target_rpm = 0;
     //if (target_rpm > max_rpm) target_rpm = max_rpm;
-    //if (duty_cycle < 0.0) duty_cycle = 0.0;
-    //if (duty_cycle > 1.0) duty_cycle = 1.0;
-    
     // Calculate and set PWM duty cycle based on target RPM
     // Map target RPM from 0 to 3600 RPM to a duty cycle from 0% to 100%
     //duty_cycle = static_cast<float>(target_rpm) / max_rpm;
+    */
 
+    //if (duty_cycle < 0.0) duty_cycle = 0.0;
+    //if (duty_cycle > 1.0) duty_cycle = 1.0;
+    
     fan.write(duty_cycle);
-    //fan.write(duty_cycle);
-    // Print the current duty cycle to the command window
+
     printf("Current duty cycle: %.2f (Target RPM: %d)\n", duty_cycle, target_rpm);
 }
 
@@ -61,8 +61,7 @@ int main() {
     printf("Starting fan control with encoder\n");
 
     // Initialize PWM for the fan
-    fan.period(0.02f);    // Set period for 25 kHz PWM (adjust for your fan specs)
-    //update_fan_speed(current_duty_cycle);      // Set initial duty cycle based on target RPM
+    fan.period(0.02f);   
 
     // Attach interrupt for the tachometer
     fan_tacho.rise(&count_pulse); // Count rising edges
@@ -92,9 +91,10 @@ int main() {
 
                 // Update fan speed based on the new target RPM
                 //update_fan_speed();
-
                 // Output the encoder count and target RPM to serial
                 //printf("The encoder count is %d. Target RPM: %d\n", target_rpm / 100, target_rpm);
+
+
             }
         }
 
@@ -105,7 +105,7 @@ int main() {
 
         float delta_t = 0.1f;
         // Calculate RPM once per second
-        if (rpm_timer.elapsed_time().count() >= 100000) { // 1 second elapsed
+        if (rpm_timer.elapsed_time().count() >= 1000000) { // 1 second elapsed
             rpm_timer.reset();
 
             // Calculate RPM: (pulse_count / 2) * 60 for a 2-pulse per revolution fan
@@ -119,7 +119,7 @@ int main() {
             // Output current RPM and target RPM to serial
             
 
-            /*
+            /* Below code was working for open loop! 
             // Adjust duty cycle if the RPM is not equal to the target RPM
             if (rpm < target_rpm) {
                 // If the actual RPM is less than the target, increase the duty cycle
@@ -138,6 +138,8 @@ int main() {
             // Output the adjusted duty cycle
             printf("Adjusted Duty Cycle: %.2f\n", current_duty_cycle);
             */
+
+
             int error = target_rpm - rpm;
             integral += error * delta_t;
             int derivative = error - prev_error;
@@ -155,7 +157,6 @@ int main() {
             printf("Calculated duty cycle: %.2f, Fan RPM: %d, Target RPM: %d\n", current_duty_cycle, rpm, target_rpm);
 
             prev_error = error;
-            wait_us(1000000);
         }
     }
 }
