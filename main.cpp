@@ -1,8 +1,16 @@
 //https://chatgpt.com/share/6734cb16-d66c-800f-850d-4885cfd94bdc
 
+
 #include "mbed.h"
 #include <iterator>
 #include <stdio.h>
+
+#include <cstdint>
+#include "LCD_ST7066U.h"
+
+LCD lcd(PB_15, PB_14, PB_10, PA_8, PB_2, PB_1); // Adjust pin names as per your hardware
+
+
 
 DigitalOut led(LED1);
 DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
@@ -93,6 +101,10 @@ int main() {
                 //update_fan_speed();
                 // Output the encoder count and target RPM to serial
                 //printf("The encoder count is %d. Target RPM: %d\n", target_rpm / 100, target_rpm);
+              
+              lcd.writeLine("Initializing...", 1); // Write text to the second line
+              wait_us(500000);
+              lcd.clear();
 
 
             }
@@ -159,5 +171,6 @@ int main() {
             prev_error = error;
         }
     }
+
 }
 

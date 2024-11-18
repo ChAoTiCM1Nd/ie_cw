@@ -7,3 +7,4 @@ compile_commands.json
 .clangd
 .cache
 mbed-os
+LCD_ST7066U/.hg/*
