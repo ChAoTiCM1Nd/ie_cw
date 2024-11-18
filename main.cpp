@@ -8,8 +8,7 @@
 #include <cstdint>
 #include "LCD_ST7066U.h"
 
-LCD lcd(PB_15, PB_14, PB_10, PA_8, PB_2, PB_1); // Adjust pin names as per your hardware
-
+LCD lcd(PB_15, PB_14, PB_10, PA_8, PB_2, PB_1); // Instantiated 
 
 
 DigitalOut led(LED1);
@@ -102,7 +101,7 @@ int main() {
                 // Output the encoder count and target RPM to serial
                 //printf("The encoder count is %d. Target RPM: %d\n", target_rpm / 100, target_rpm);
               
-              lcd.writeLine("Initializing...", 1); // Write text to the second line
+              lcd.writeLine("Initializing...", 0); // Write text to the second line
               wait_us(500000);
               lcd.clear();
 
