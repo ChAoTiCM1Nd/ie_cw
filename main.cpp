@@ -75,6 +75,7 @@ int main() {
 
     Timer rpm_timer;
     rpm_timer.start();
+    lcd.writeLine("Initializing...", 0); // Write text to the second line
 
     while (true) {
         // Rotary encoder logic
@@ -100,10 +101,11 @@ int main() {
                 //update_fan_speed();
                 // Output the encoder count and target RPM to serial
                 //printf("The encoder count is %d. Target RPM: %d\n", target_rpm / 100, target_rpm);
-              
-              lcd.writeLine("Initializing...", 0); // Write text to the second line
-              wait_us(500000);
-              lcd.clear();
+                char buffer[16];
+                sprintf(buffer, "Target RPM: %d", target_rpm);
+                lcd.writeLine(buffer, 0);
+                //wait_us(500000);
+                //lcd.clear();
 
 
             }
@@ -119,12 +121,16 @@ int main() {
         if (rpm_timer.elapsed_time().count() >= 1000000) { // 1 second elapsed
             rpm_timer.reset();
 
+            printf("Pulse count: %d \n", pulse_count);
+
             // Calculate RPM: (pulse_count / 2) * 60 for a 2-pulse per revolution fan
             int rpm;
             {
                 CriticalSectionLock lock; // Ensure atomic access
                 rpm = (pulse_count / 2) * 60;
                 pulse_count = 0; // Reset pulse count after reading
+
+                
             }
 
             // Output current RPM and target RPM to serial
@@ -160,6 +166,10 @@ int main() {
             if (integral < integral_min) integral = integral_min;
 
             float pid_output = (Kp * error) + (Ki * integral) + (Kd * 0.00f);
+
+            char buffer_rpm[16];
+            sprintf(buffer_rpm, "RPM: %d", rpm);
+            lcd.writeLine(buffer_rpm, 1);
 
             current_duty_cycle += pid_output;
             update_fan_speed(current_duty_cycle);
