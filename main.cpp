@@ -28,6 +28,8 @@ DigitalIn inc2(PA_4);               // Rotary encoder channel B
 BufferedSerial mypc(USBTX, USBRX, 19200);
 DigitalIn button(BUTTON1);
 
+Timer c_timer;
+
 
 FanMode current_mode = OFF;
 
@@ -53,12 +55,20 @@ float current_duty_cycle = 0.0;     // Initial duty cycle set to 50%
 float prev_error = 0;
 float integral = 0;
 
+
+// Interrupt service routine to count tachometer pulses
+void count_pulse() {
+    CriticalSectionLock lock;
+    pulse_count++;
+    led = !led;
+}
+
 void rpm_calc_thread(){
     Timer timer;
     timer.start();
 
     while (true) {
-        if (timer.elapsed_time().count() >= 2000000) { // 1-second interval
+        if (timer.elapsed_time().count() >= 1000000) { // 1-second interval
             timer.reset();
 
             // Calculate RPM: (pulse_count / 2) * 60 for 2-pulse/rev fans
@@ -143,36 +153,59 @@ void calc_target_rpm(){
 // The closed loop mode logic is housed here. 
 void handle_closed_loop_ctrl(){
 
-    int rpm;
-    rpm_mutex.lock();
-    rpm = calculated_rpm;
-    rpm_mutex.unlock();
 
+    fan_tacho.rise(&count_pulse); // Count rising edges
+    
+    calc_target_rpm();
 
     //char rpm_buffer[16];
     //sprintf(rpm_buffer, "RPM: %d", target_rpm);
     //safe_lcd_write(rpm_buffer,1 );
 
     //Function to update the target_rpm global variable.
-    calc_target_rpm();
-    // Writing the target RPM to the LCD.
 
-    float delta_t = 0.1f;
-    int error = target_rpm - rpm;
-    integral += error * delta_t;
-    int derivative = error - prev_error;
+
+
     // Apply clamping to prevent windup
-    if (integral > integral_max) integral = integral_max;
-    if (integral < integral_min) integral = integral_min;
+    //if (integral > integral_max) integral = integral_max;
+    //if (integral < integral_min) integral = integral_min;
 
-    float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.00f);
+    
 
-    current_duty_cycle += pid_output;
-    update_fan_speed(current_duty_cycle);
+    
+    c_timer.start();
 
-    //printf("Fan RPM: %d, Target RPM: %d, calculated PID Output is %.2f \nIntegral: %.2f, Derivative: %d, Error: %d\n", rpm, target_rpm, pid_output, integral, derivative, error);
-    printf("Fan RPM: %d, Target RPM: %d, duty cycle: %.2f\n", rpm, target_rpm, current_duty_cycle);
-    prev_error = error;
+    
+    if (c_timer.elapsed_time().count() >= 1000000) { // 1-second interval
+        c_timer.reset();
+
+        int rpm;
+        rpm_mutex.lock();
+        rpm = calculated_rpm;
+        rpm_mutex.unlock();
+
+        //Function to update the target_rpm global variable.
+        
+        // Writing the target RPM to the LCD.
+
+        float delta_t = 0.1f;
+        int error = target_rpm - rpm;
+        integral += error * delta_t;
+        int derivative = error - prev_error;
+
+        float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.00f);
+
+        current_duty_cycle += pid_output;
+        update_fan_speed(current_duty_cycle);
+
+        //printf("Fan RPM: %d, Target RPM: %d, calculated PID Output is %.2f \nIntegral: %.2f, Derivative: %d, Error: %d\n", rpm, target_rpm, pid_output, integral, derivative, error);
+        printf("Fan RPM: %d, Target RPM: %d, duty cycle: %.2f\n", rpm, target_rpm, current_duty_cycle);
+
+        prev_error = error;
+
+    }
+
+    
     
 }
 
@@ -228,12 +261,7 @@ void update_state() {
 
 }
 
-// Interrupt service routine to count tachometer pulses
-void count_pulse() {
-    CriticalSectionLock lock;
-    pulse_count++;
-    led = !led;
-}
+
 
 // Main program
 int main() {
@@ -245,7 +273,7 @@ int main() {
     fan.period(0.02f);   
 
     // Attach interrupt for the tachometer
-    fan_tacho.rise(&count_pulse); // Count rising edges
+    //fan_tacho.rise(&count_pulse); // Count rising edges
 
     lcd.writeLine("Initializing...", 0); // Write text to the second line
 
@@ -278,7 +306,7 @@ int main() {
         }
         // Add a short delay to reduce CPU usage
         ThisThread::sleep_for(5ms);
-        printf("Current Mode is %d\n", current_mode);
+        //printf("Current Mode is %d\n", current_mode);
         
     }
 
