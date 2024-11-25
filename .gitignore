@@ -10,4 +10,3 @@ mbed-os
 LCD_ST7066U/.hg/*
 ie_cw
 mRotaryEncoder/.hg/*
-mRotaryEncoder-os
