@@ -25,7 +25,7 @@ InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
 DigitalIn inc1(PA_1);               // Rotary encoder channel A
 DigitalIn inc2(PA_4);               // Rotary encoder channel B
 
-//BufferedSerial mypc(USBTX, USBRX, 19200);
+BufferedSerial mypc(USBTX, USBRX, 19200);
 DigitalIn button(BUTTON1);
 
 
@@ -45,7 +45,7 @@ Mutex lcd_mutex;
 const float integral_max = 500.0; // Adjust this limit based on tuning
 const float integral_min = -500.0;
 
-float Kp = 0.00042;
+float Kp = 0.000042;
 float Ki = 0.00000;
 float Kd = 0.0000;
 
@@ -58,7 +58,7 @@ void rpm_calc_thread(){
     timer.start();
 
     while (true) {
-        if (timer.elapsed_time().count() >= 1000000) { // 1-second interval
+        if (timer.elapsed_time().count() >= 2000000) { // 1-second interval
             timer.reset();
 
             // Calculate RPM: (pulse_count / 2) * 60 for 2-pulse/rev fans
@@ -127,6 +127,9 @@ void calc_target_rpm(){
             sprintf(buffer, "Target RPM: %d", target_rpm);
             safe_lcd_write(buffer,0 );
 
+
+
+
         }
     }
 
@@ -145,6 +148,11 @@ void handle_closed_loop_ctrl(){
     rpm = calculated_rpm;
     rpm_mutex.unlock();
 
+
+    //char rpm_buffer[16];
+    //sprintf(rpm_buffer, "RPM: %d", target_rpm);
+    //safe_lcd_write(rpm_buffer,1 );
+
     //Function to update the target_rpm global variable.
     calc_target_rpm();
     // Writing the target RPM to the LCD.
@@ -159,11 +167,11 @@ void handle_closed_loop_ctrl(){
 
     float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.00f);
 
-    //current_duty_cycle += pid_output;
-    //update_fan_speed(current_duty_cycle);
+    current_duty_cycle += pid_output;
+    update_fan_speed(current_duty_cycle);
 
     //printf("Fan RPM: %d, Target RPM: %d, calculated PID Output is %.2f \nIntegral: %.2f, Derivative: %d, Error: %d\n", rpm, target_rpm, pid_output, integral, derivative, error);
-    //printf("Fan RPM: %d, Target RPM: %d\n", rpm, target_rpm);
+    printf("Fan RPM: %d, Target RPM: %d, duty cycle: %.2f\n", rpm, target_rpm, current_duty_cycle);
     prev_error = error;
     
 }
