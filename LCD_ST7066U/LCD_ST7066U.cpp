@@ -28,12 +28,12 @@
 
 LCD::LCD(PinName rs, PinName e, PinName d4, PinName d5, PinName d6, PinName d7): _rs(rs), _e(e), _d4(d4), _d5(d5), _d6(d6), _d7(d7), _row(0), _column(0)
 {
-    wait_us(100000);
+    wait_ms(100);
     LCD::init();
 }
 
 void LCD::init(){
-    wait_us(100000);
+    wait_ms(100);
     
     startUp();
     
@@ -63,7 +63,7 @@ void LCD::startUp(){
 
 void LCD::writeTime(){
     _e = 1;
-    wait_us(5000);
+    wait_ms(5);
     _e = 0;
 }
 

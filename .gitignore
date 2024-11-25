@@ -8,3 +8,5 @@ compile_commands.json
 .cache
 mbed-os
 LCD_ST7066U/.hg/*
+LCD_ST7066U
+ie_cw
