@@ -47,7 +47,7 @@ Mutex lcd_mutex;
 const float integral_max = 500.0; // Adjust this limit based on tuning
 const float integral_min = -500.0;
 
-float Kp = 0.000042;
+float Kp = 0.000142;
 float Ki = 0.00000;
 float Kd = 0.0000;
 
@@ -137,9 +137,6 @@ void calc_target_rpm(){
             sprintf(buffer, "Target RPM: %d", target_rpm);
             safe_lcd_write(buffer,0 );
 
-
-
-
         }
     }
 
@@ -163,16 +160,11 @@ void handle_closed_loop_ctrl(){
     //safe_lcd_write(rpm_buffer,1 );
 
     //Function to update the target_rpm global variable.
-
-
-
     // Apply clamping to prevent windup
     //if (integral > integral_max) integral = integral_max;
     //if (integral < integral_min) integral = integral_min;
 
-    
 
-    
     c_timer.start();
 
     
@@ -213,17 +205,28 @@ void handle_open_loop_ctrl() {
 
     calc_target_rpm();
 
-    // Calculate and set PWM duty cycle based on target RPM
-    // Map target RPM from 0 to 3600 RPM to a duty cycle from 0% to 100%
-    current_duty_cycle = static_cast<float>(target_rpm) / max_rpm;
+    c_timer.start();
 
-    // Set the adjusted duty cycle to the fan
-    fan.write(current_duty_cycle);
+    if (c_timer.elapsed_time().count() >= 1000000) { // 1-second interval
+        c_timer.reset();
 
-    // Output the adjusted duty cycle
-    char open_buffer[16];
-    sprintf(open_buffer, "Duty Cycle: %.2f\n", current_duty_cycle);
-    safe_lcd_write(open_buffer,1);
+
+
+        // Calculate and set PWM duty cycle based on target RPM
+        // Map target RPM from 0 to 3600 RPM to a duty cycle from 0% to 100%
+        current_duty_cycle = static_cast<float>(target_rpm) / max_rpm;
+
+        // Set the adjusted duty cycle to the fan
+        fan.write(current_duty_cycle);
+
+        // Output the adjusted duty cycle
+        char open_buffer[16];
+        sprintf(open_buffer, "Duty Cycle: %.2f\n", current_duty_cycle);
+        safe_lcd_write(open_buffer,1);
+
+        update_fan_speed(current_duty_cycle);
+
+    }
 }
 
 // Function to handle AUTO mode
