@@ -3,8 +3,12 @@
 #include <stdio.h>
 #include <cstdint>
 #include "LCD_ST7066U.h"
+#include "mRotaryEncoder.h"
 
 LCD lcd(PB_15, PB_14, PB_10, PA_8, PB_2, PB_1); // Instantiated LCD
+
+// Rotary encoder using mRotaryEncoder
+mRotaryEncoder encoder(PA_1, PA_4, NC, PullUp, 2000, 1, 1);
 
 enum FanMode{
     OFF,
@@ -17,19 +21,22 @@ DigitalOut led(LED1);
 DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
 PwmOut fan(PB_0);                   // PWM control for the fan
 InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
-DigitalIn inc1(PA_1);               // Rotary encoder channel A
-DigitalIn inc2(PA_4);               // Rotary encoder channel B
+//DigitalIn inc1(PA_1);               // Rotary encoder channel A
+//DigitalIn inc2(PA_4);               // Rotary encoder channel B
 
 BufferedSerial mypc(USBTX, USBRX, 19200);
 DigitalIn button(BUTTON1);
 
 Timer c_timer;
-
+Timer o_timer;
 FanMode current_mode = OFF;
 
 volatile int pulse_count = 0;       // Counts tachometer pulses
 volatile int target_rpm = 200;     // Initial target RPM (50% of max RPM)
-int inc1_prev = 0;                  // Previous state of inc1 for edge detection
+//int inc1_prev = 0;                  // Previous state of inc1 for edge detection
+
+
+int last_encoder_value = 0;         // Previous encoder value for detecting changes
 
 volatile int calculated_rpm = 0;
 Mutex rpm_mutex;
@@ -107,32 +114,23 @@ void safe_lcd_write(const char* text, int line) {
 
 void calc_target_rpm(){
     // Rotary encoder logic
-    if (inc1.read() != inc1_prev) {
-        if (inc1_prev == 0 && inc1.read() == 1) {    // Rising edge of inc1
-            if (inc2.read() == 0) {
-                // Clockwise rotation: increase target RPM
-                target_rpm += 25;  // Increase target RPM by 25
-            } else {
-                // Counterclockwise rotation: decrease target RPM
-                target_rpm -= 25;  // Decrease target RPM by 25
-            }
+    int encoder_value = encoder.Get();
+    int encoder_diff = encoder_value - last_encoder_value;
 
-            if (target_rpm < 0) target_rpm = 0;
+    if (encoder_diff != 0) {
+        target_rpm += encoder_diff * 25; // Adjust RPM by 25 per encoder step
+        if (target_rpm < 0) target_rpm = 0;
 
-            // Writing the target RPM to the LCD.
-            char buffer[16];
-            sprintf(buffer, "Target RPM: %d", target_rpm);
-            safe_lcd_write(buffer, 0);
+        char buffer[16];
+        sprintf(buffer, "Target RPM: %d", target_rpm);
+        safe_lcd_write(buffer, 0);
 
-            if (target_rpm != last_target_rpm) {
-                printf("Target RPM changed: %d\n", target_rpm);  // Print state to serial monitor only on change
-            }
-
+        if (target_rpm != last_target_rpm) {
+            printf("Target RPM changed: %d\n", target_rpm);
             last_target_rpm = target_rpm;
         }
     }
-    inc1_prev = inc1.read(); // Update previous state
-    wait_us(700); // Debounce
+    last_encoder_value = encoder_value;
 }
 
 void handle_closed_loop_ctrl(){
@@ -171,14 +169,16 @@ void handle_closed_loop_ctrl(){
 void handle_open_loop_ctrl() {
     calc_target_rpm();
 
-    c_timer.start();
+    o_timer.start();
 
-    if (c_timer.elapsed_time().count() >= 1000000) { // 1-second interval
-        c_timer.reset();
+    if (o_timer.elapsed_time().count() >= 1000000) { // 1-second interval
+        o_timer.reset();
 
         // Calculate and set PWM duty cycle based on target RPM
         // Use the equation: y = 653.38 * target_rpm - 94.626
         current_duty_cycle = 653.38 * target_rpm - 94.626;
+
+        printf("Duty cycle: %.2f\n", current_duty_cycle);
 
         // Map the duty cycle to a valid range (0.0 to 1.0)
         if (current_duty_cycle < 0.0) current_duty_cycle = 0.0;
@@ -188,9 +188,9 @@ void handle_open_loop_ctrl() {
         fan.write(current_duty_cycle);
 
         // Display duty cycle on LCD
-        char open_buffer[16];
-        sprintf(open_buffer, "Duty Cycle: %.2f", current_duty_cycle);
-        safe_lcd_write(open_buffer, 1);
+        //char open_buffer[16];
+        //sprintf(open_buffer, "Duty Cycle: %.2f", current_duty_cycle);
+        //safe_lcd_write(open_buffer, 1);
 
         if (current_duty_cycle != last_calculated_rpm) {
             printf("Duty Cycle changed: %.2f\n", current_duty_cycle);  // Print state to serial monitor only on change
@@ -212,8 +212,10 @@ void update_state() {
     static Timer debounce_timer;
     debounce_timer.start();
 
+    static int last_local_button_state = 1;
+
     int button_state = button.read();  // Read the current button state
-    if (button_state == 0 && last_button_state == 1 && debounce_timer.elapsed_time().count() > 100000) {
+    if (button_state == 0 && last_local_button_state == 1 && debounce_timer.elapsed_time().count() > 100000) {
         debounce_timer.reset();
 
         // Cycle through the states
@@ -223,7 +225,7 @@ void update_state() {
         switch (current_mode) {
             case OFF:
                 lcd.writeLine("Mode: Off", 0);
-                if (last_button_state == 0) {
+                if (last_local_button_state == 0) {
                     printf("Fan is OFF\n");  // Print state to serial monitor only on change
                 }
                 break;
@@ -241,7 +243,7 @@ void update_state() {
                 break;
         }
     }
-    last_button_state = button_state;  // Update the previous state of the button
+    last_local_button_state = button_state;  // Update the previous state of the button
 }
 
 // Main program
@@ -281,5 +283,7 @@ int main() {
         }
         // Add a short delay to reduce CPU usage
         ThisThread::sleep_for(5ms);
+
+        //printf("Current mode is: %d\n",current_mode);
     }
 }
