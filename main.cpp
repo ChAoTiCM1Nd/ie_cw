@@ -10,240 +10,214 @@ LCD lcd(PB_15, PB_14, PB_10, PA_8, PB_2, PB_1); // Instantiated LCD
 // Rotary encoder using mRotaryEncoder
 mRotaryEncoder encoder(PA_1, PA_4, NC, PullUp, 2000, 1, 1);
 
-enum FanMode{
+enum FanMode {
     OFF,
     ENCDR_C_LOOP,
     ENCDR_O_LOOP,
     AUTO
-}; 
+};
 
 DigitalOut led(LED1);
-DigitalOut led_ext(PC_0);           // External LED for counterclockwise indication
 PwmOut fan(PB_0);                   // PWM control for the fan
 InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
-//DigitalIn inc1(PA_1);               // Rotary encoder channel A
-//DigitalIn inc2(PA_4);               // Rotary encoder channel B
-
 BufferedSerial mypc(USBTX, USBRX, 19200);
 DigitalIn button(BUTTON1);
 
 Timer c_timer;
-Timer o_timer;
 FanMode current_mode = OFF;
 
 volatile int pulse_count = 0;       // Counts tachometer pulses
-volatile int target_rpm = 200;     // Initial target RPM (50% of max RPM)
-//int inc1_prev = 0;                  // Previous state of inc1 for edge detection
-
-
+volatile int target_rpm = 200;      // Initial target RPM
 int last_encoder_value = 0;         // Previous encoder value for detecting changes
 
-volatile int calculated_rpm = 0;
+float Kp = 0.0003; // Adjusted for improved closed-loop behavior
+float Ki = 0.00001;
+float Kd = 0.0;
+
+float current_duty_cycle = 0.0;     // Initial duty cycle
+float prev_error = 0.0;
+float integral = 0.0;
+
+// Define limits for the integral term
+const float integral_max = 500.0;
+const float integral_min = -500.0;
+
+const int MAX_RPM = 1800; // Maximum RPM corresponding to 100% duty cycle
+
 Mutex rpm_mutex;
 Mutex lcd_mutex;
 
-// Define limits for the integral term
-const float integral_max = 500.0; // Adjust this limit based on tuning
-const float integral_min = -500.0;
+Timer rpm_timer;
 
-float Kp = 0.000142;
-float Ki = 0.00000;
-float Kd = 0.0000;
-
-float current_duty_cycle = 0.0;     // Initial duty cycle set to 50%
-float prev_error = 0;
-float integral = 0;
-
-// Previous states for change detection
-bool last_button_state = 1; // Button was initially not pressed (active-low)
-int last_calculated_rpm = 0;
-int last_target_rpm = target_rpm;
-
+// Function to count tachometer pulses
 void count_pulse() {
     CriticalSectionLock lock;
     pulse_count++;
-    led = !led;
+    led = !led; // Toggle LED on each pulse
 }
 
-void rpm_calc_thread(){
-    Timer timer;
-    timer.start();
-
-    while (true) {
-        if (timer.elapsed_time().count() >= 1000000) { // 1-second interval
-            timer.reset();
-
-            // Calculate RPM: (pulse_count / 2) * 60 for 2-pulse/rev fans
-            int rpm;
-            {
-                CriticalSectionLock lock; // Atomic access to `pulse_count`
-                rpm = pulse_count;
-                pulse_count = 0; // Reset after reading
-            }
-
-            // Update shared variable
-            rpm_mutex.lock();
-            calculated_rpm = rpm;
-            rpm_mutex.unlock();
-        }
-        ThisThread::sleep_for(5ms); // Prevent high CPU usage
-    }
-}
-
-// Function to update fan speed based on target RPM
+// Function to update fan speed based on duty cycle
 void update_fan_speed(float duty_cycle) {
-    if (duty_cycle < 0.0) duty_cycle = 0.0;
-    if (duty_cycle > 1.0) duty_cycle = 1.0;
-    
+    if (duty_cycle < 0.0f) duty_cycle = 0.0f;
+    if (duty_cycle > 1.0f) duty_cycle = 1.0f;
+
     fan.write(duty_cycle);
 }
 
-void handle_off_mode(){
-    fan.write(0.0); // Turn off the fan
-    lcd.writeLine("Off", 0);
-    if (last_button_state == 0) {
-        printf("Fan is OFF\n");  // Print state to serial monitor only on change
-    }
-}
-
+// Function for safely updating the LCD
 void safe_lcd_write(const char* text, int line) {
     lcd_mutex.lock();
     lcd.writeLine(text, line);
     lcd_mutex.unlock();
 }
 
-void calc_target_rpm(){
-    // Rotary encoder logic
+// Function to calculate target RPM based on encoder input
+void calc_target_rpm() {
     int encoder_value = encoder.Get();
     int encoder_diff = encoder_value - last_encoder_value;
 
     if (encoder_diff != 0) {
         target_rpm += encoder_diff * 25; // Adjust RPM by 25 per encoder step
         if (target_rpm < 0) target_rpm = 0;
+        if (target_rpm > MAX_RPM) target_rpm = MAX_RPM;
 
         char buffer[16];
         sprintf(buffer, "Target RPM: %d", target_rpm);
         safe_lcd_write(buffer, 0);
 
-        if (target_rpm != last_target_rpm) {
-            printf("Target RPM changed: %d\n", target_rpm);
-            last_target_rpm = target_rpm;
-        }
+        printf("Target RPM: %d\n", target_rpm);
     }
+
     last_encoder_value = encoder_value;
 }
 
-void handle_closed_loop_ctrl(){
-    fan_tacho.rise(&count_pulse); // Count rising edges
+// Ensure tachometer is monitored
+void setup_tachometer() {
+    fan_tacho.rise(&count_pulse); // Attach interrupt on rising edge
+    rpm_timer.start();
+}
+
+// Ensure PWM and fan are properly set up
+void setup_pwm() {
+    fan.period(0.02f); // 20 ms period for PWM
+    fan.write(0.0f);   // Start with the fan off
+}
+
+// Check tachometer pulse count
+void validate_tachometer() {
+    if (pulse_count == 0) {
+        printf("Tachometer pulse count is zero. Check tachometer wiring.\n");
+    } else {
+        printf("Tachometer is active. Pulse count: %d\n", pulse_count);
+    }
+}
+
+// Updated closed-loop control logic
+void handle_closed_loop_ctrl() {
     calc_target_rpm();
 
-    c_timer.start();
-
-    if (c_timer.elapsed_time().count() >= 1000000) { // 1-second interval
-        c_timer.reset();
+    if (rpm_timer.elapsed_time().count() >= 1000000) { // 1-second interval
+        rpm_timer.reset();
 
         int rpm;
-        rpm_mutex.lock();
-        rpm = calculated_rpm;
-        rpm_mutex.unlock();
+        {
+            CriticalSectionLock lock; // Atomic access to pulse_count
+            rpm = (pulse_count * 60); // 2 pulses per revolution: RPM = pulse_count * 30
+            pulse_count = 0;          // Reset after calculation
+        }
 
-        float delta_t = 0.1f;
+        validate_tachometer(); // Debug tachometer activity
+
         int error = target_rpm - rpm;
-        integral += error * delta_t;
-        int derivative = error - prev_error;
 
-        float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.00f);
+        // PID calculations
+        float delta_t = 1.0f; // 1-second intervals
+        integral += error * delta_t;
+
+        // Integral windup protection
+        if (integral > integral_max) integral = integral_max;
+        if (integral < integral_min) integral = integral_min;
+
+        float derivative = (error - prev_error) / delta_t;
+        float pid_output = (Kp * error) + (Ki * integral) + (Kd * derivative);
 
         current_duty_cycle += pid_output;
+        if (current_duty_cycle > 1.0f) current_duty_cycle = 1.0f;
+        if (current_duty_cycle < 0.0f) current_duty_cycle = 0.0f;
+
         update_fan_speed(current_duty_cycle);
 
-        if (rpm != last_calculated_rpm) {
-            printf("Fan RPM: %d, Target RPM: %d, duty cycle: %.2f\n", rpm, target_rpm, current_duty_cycle);  // Print state to serial monitor only on change
-            last_calculated_rpm = rpm;
-        }
+        printf("Closed Loop: Target RPM: %d, Measured RPM: %d, Duty Cycle: %.2f, Error: %d\n",
+               target_rpm, rpm, current_duty_cycle, error);
 
         prev_error = error;
     }
 }
 
+// Function for open-loop control
 void handle_open_loop_ctrl() {
     calc_target_rpm();
 
-    o_timer.start();
+    // Calculate duty cycle based on target RPM
+    current_duty_cycle = (float)target_rpm / MAX_RPM;
 
-    if (o_timer.elapsed_time().count() >= 1000000) { // 1-second interval
-        o_timer.reset();
+    // Constrain duty cycle
+    if (current_duty_cycle > 1.0f) current_duty_cycle = 1.0f;
+    if (current_duty_cycle < 0.0f) current_duty_cycle = 0.0f;
 
-        // Calculate and set PWM duty cycle based on target RPM
-        // Use the equation: y = 653.38 * target_rpm - 94.626
-        current_duty_cycle = 653.38 * target_rpm - 94.626;
+    update_fan_speed(current_duty_cycle);
 
-        printf("Duty cycle: %.2f\n", current_duty_cycle);
+    // Display duty cycle on LCD
+    char buffer[16];
+    sprintf(buffer, "Duty: %.2f", current_duty_cycle);
+    safe_lcd_write(buffer, 1);
 
-        // Map the duty cycle to a valid range (0.0 to 1.0)
-        if (current_duty_cycle < 0.0) current_duty_cycle = 0.0;
-        if (current_duty_cycle > 1.0) current_duty_cycle = 1.0;
-
-        // Set the adjusted duty cycle to the fan
-        fan.write(current_duty_cycle);
-
-        // Display duty cycle on LCD
-        //char open_buffer[16];
-        //sprintf(open_buffer, "Duty Cycle: %.2f", current_duty_cycle);
-        //safe_lcd_write(open_buffer, 1);
-
-        if (current_duty_cycle != last_calculated_rpm) {
-            printf("Duty Cycle changed: %.2f\n", current_duty_cycle);  // Print state to serial monitor only on change
-            last_calculated_rpm = current_duty_cycle;
-        }
-
-        update_fan_speed(current_duty_cycle);
-    }
+    printf("Open Loop: Target RPM: %d, Duty Cycle: %.2f\n", target_rpm, current_duty_cycle);
 }
 
-// Function to handle AUTO mode
-void handle_auto_mode() {
-    lcd.clear();
-    lcd.writeLine("Auto", 0);
-    printf("Fan is in AUTO mode\n");  // Print state to serial monitor only on change
+// Function to handle OFF mode
+void handle_off_mode() {
+    fan.write(0.0f); // Turn off the fan
+    lcd.writeLine("Off", 0);
+    printf("Fan is OFF\n");
 }
 
+// Function to update the state machine based on button input
 void update_state() {
     static Timer debounce_timer;
     debounce_timer.start();
 
-    static int last_local_button_state = 1;
+    static int last_button_state = 1;
+    int button_state = button.read();
 
-    int button_state = button.read();  // Read the current button state
-    if (button_state == 0 && last_local_button_state == 1 && debounce_timer.elapsed_time().count() > 100000) {
+    if (button_state == 0 && last_button_state == 1 && debounce_timer.elapsed_time().count() > 100000) {
         debounce_timer.reset();
 
         // Cycle through the states
         current_mode = static_cast<FanMode>((current_mode + 1) % 4);
 
-        // Print state change only if mode changes
+        // Update LCD based on mode
         switch (current_mode) {
             case OFF:
                 lcd.writeLine("Mode: Off", 0);
-                if (last_local_button_state == 0) {
-                    printf("Fan is OFF\n");  // Print state to serial monitor only on change
-                }
+                printf("Fan is OFF\n");
                 break;
             case ENCDR_C_LOOP:
                 lcd.writeLine("Mode: Closed Loop", 0);
-                printf("Fan is in Closed Loop mode\n");  // Print state to serial monitor only on change
+                printf("Fan is in Closed Loop mode\n");
                 break;
             case ENCDR_O_LOOP:
                 lcd.writeLine("Mode: Open Loop", 0);
-                printf("Fan is in Open Loop mode\n");  // Print state to serial monitor only on change
+                printf("Fan is in Open Loop mode\n");
                 break;
             case AUTO:
                 lcd.writeLine("Mode: Auto", 0);
-                printf("Fan is in AUTO mode\n");  // Print state to serial monitor only on change
+                printf("Fan is in AUTO mode\n");
                 break;
         }
     }
-    last_local_button_state = button_state;  // Update the previous state of the button
+
+    last_button_state = button_state;
 }
 
 // Main program
@@ -251,19 +225,13 @@ int main() {
     button.mode(PullUp);
     printf("Starting fan control with encoder\n");
 
-    // Initialize PWM for the fan
-    fan.period(0.02f);   
+    setup_pwm();
+    setup_tachometer();
+    lcd.writeLine("Initializing...", 0);
 
-    lcd.writeLine("Initializing...", 0); // Write text to the second line
-
-    rtos::Thread rpm_thread;
-    rpm_thread.start(rpm_calc_thread);
-
-    // Main Finite State Machine logic here. 
     while (true) {
         update_state();
 
-        // Execute logic for the current mode
         switch (current_mode) {
             case OFF:
                 handle_off_mode();
@@ -278,12 +246,10 @@ int main() {
                 break;
 
             case AUTO:
-                handle_auto_mode();
+                // Placeholder for AUTO mode logic
                 break;
         }
-        // Add a short delay to reduce CPU usage
-        ThisThread::sleep_for(5ms);
 
-        //printf("Current mode is: %d\n",current_mode);
+        ThisThread::sleep_for(5ms);
     }
 }
