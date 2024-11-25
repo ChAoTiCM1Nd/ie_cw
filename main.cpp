@@ -10,8 +10,6 @@ PwmOut fan(PB_0);                   // PWM control for the fan
 InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
 BufferedSerial mypc(USBTX, USBRX, 115200);
 
-// Rotary encoder pins and instance
-mRotaryEncoder encoder(PA_1, PA_4);
 
 // Constants and variables
 const int max_rpm = 3600;           // Maximum fan RPM
@@ -21,6 +19,9 @@ float Kp = 0.00042, Ki = 0.0, Kd = 0.0;
 float current_duty_cycle = 0.0;     // Initial duty cycle
 float prev_error = 0, integral = 0;
 const float integral_max = 500.0, integral_min = -500.0; // Integral limits
+
+// Rotary encoder pins and instance
+mRotaryEncoder encoder(PA_1, PA_4, PC_1);
 
 // Function to update fan speed based on target RPM
 void update_fan_speed(float duty_cycle) {
@@ -46,15 +47,20 @@ int main() {
 
     while (true) {
         // Read rotary encoder value and adjust target RPM
-        int encoder_change = encoder.getDiff(); // Get rotation difference
+        int encoder_position = encoder.Get();  // Get the encoder's absolute position
+        int encoder_change = encoder_position - target_rpm / 100; // Calculate relative change
+
         if (encoder_change != 0) {
-            target_rpm += encoder_change * 100; // Change RPM in increments of 100
+            target_rpm += encoder_change * 100; // Adjust target RPM based on encoder change
             if (target_rpm > max_rpm) target_rpm = max_rpm;
             if (target_rpm < 0) target_rpm = 0;
 
             char buffer[16];
             sprintf(buffer, "Target RPM: %d", target_rpm);
             lcd.writeLine(buffer, 0);
+
+            // Reset encoder position to prevent accumulation
+            encoder.Set(target_rpm / 100);
         }
 
         // Calculate RPM and apply PID control every second
