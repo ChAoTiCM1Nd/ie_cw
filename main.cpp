@@ -55,7 +55,7 @@ DigitalIn button(BUTTON1);
 Timer rpm_timer, print_timer;
 FanMode current_mode = OFF;
 
-
+volatile float global_dc = 0;
 
 // Tachometer pulse counting logic
 void count_pulse() {
@@ -65,13 +65,51 @@ void count_pulse() {
     static uint32_t last_time = 0;  // Time of the last valid pulse
     uint32_t current_time = osKernelGetTickCount();
 
-    if (current_time - last_time > 15) {  // Minimum time between pulses
-
+    if (current_time - last_time > 8) 
+    {
         CriticalSectionLock lock;
         pulse_count++;  // Increment count
         last_time = current_time;  // Update last pulse time
     }
 
+}
+
+    /*
+    if ((current_time - last_time > 15) && (global_dc >= 0.5)) {  // Minimum time between pulses
+       
+
+       CriticalSectionLock lock;
+        pulse_count++;  // Increment count
+        last_time = current_time;  // Update last pulse time
+       }
+
+    else if (   (0.4 < global_dc < 0.5) && (current_time - last_time > 20) ){
+    
+        CriticalSectionLock lock;
+        pulse_count++;  // Increment count
+        last_time = current_time;  // Update last pulse time
+
+    }
+    else if (0.3 < global_dc < 0.4 && current_time - last_time > 50 ){
+    
+        CriticalSectionLock lock;
+        pulse_count++;  // Increment count
+        last_time = current_time;  // Update last pulse time
+    }
+    else if ((0.2 < global_dc < 0.3) && (current_time - last_time > 150) ){
+    
+        CriticalSectionLock lock;
+        pulse_count++;  // Increment count
+        last_time = current_time;  // Update last pulse time
+    }
+
+    else if ((0.01 < global_dc < 0.2) && (current_time - last_time > 250) ){
+    
+        CriticalSectionLock lock;
+        pulse_count++;  // Increment count
+        last_time = current_time;  // Update last pulse time
+    }
+*/
     /*
     static uint32_t last_time = 0;  // Time of the last valid pulse
     uint32_t current_time = osKernelGetTickCount();  // Get current system time in ticks (milliseconds)
@@ -84,7 +122,7 @@ void count_pulse() {
         }
     }
     */
-}
+
 
 // Function to calculate RPM
 int calculate_rpm() {
@@ -113,7 +151,7 @@ int calculate_rpm() {
         last_pulse_time = current_time;  // Update the time for the next calculation
 
         // Apply a simple low-pass filter for stability
-        filtered_rpm = 0.8f * filtered_rpm + 0.2f * rpm;
+        //filtered_rpm = 0.8f * filtered_rpm + 0.2f * rpm;
 
         //printf(" filtered RPM is: %.2f, rpm: %d, pulse count: %d, time elapsed: %.2f\n", filtered_rpm, rpm, local_pulse_count, time_elapsed);
 
@@ -178,7 +216,7 @@ int calc_target_rpm() {
     static int local_target_rpm = 0;
 
     if (encoder_diff != 0) {
-        local_target_rpm += encoder_diff * 1; // Adjust RPM by 25 per encoder step
+        local_target_rpm += encoder_diff * 25; // Adjust RPM by 25 per encoder step
         local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
         // Update LCD and log
@@ -250,10 +288,15 @@ void handle_open_loop_ctrl() {
     open_duty_cycle = static_cast<float>(t_rpm) / MAX_RPM;  // Simple open-loop control
     //update_fan_speed(clamp(current_duty_cycle, 0.0f, 1.0f));
 
+    global_dc = open_duty_cycle;
+
     update_fan_speed(open_duty_cycle);
 
-
-    printf("Target RPM: %d, duty cycle: %.2f, current rpm: %d\n", t_rpm, open_duty_cycle, o_rpm);
+    if(o_rpm >0)
+    {
+        printf("Target RPM: %d, duty cycle: %.2f, current rpm: %d\n", t_rpm, open_duty_cycle, o_rpm);
+    }
+    
     ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
 }
 
@@ -301,7 +344,7 @@ void update_mode() {
 }
 
 int main() {
-    fan.period(0.01f);  // Set PWM period to 1ms (1kHz frequency)
+    fan.period(0.001f);  // Set PWM period to 1ms (1kHz frequency)
     fan.write(0.0f);     // Start with fan off
     pwm_sync = 0;        // Set PWM synchronization to low initially
 
