@@ -2,6 +2,31 @@
 #include "LCD_ST7066U.h"
 #include "mRotaryEncoder.h"
 
+volatile int pulse_count = 0;       // Counts tachometer pulses
+volatile int pulse_per_second = 0;  // Pulses in the last second
+volatile int target_rpm = 1000;     // Initial target RPM
+int last_encoder_value = 0;         // Last known encoder position
+volatile float current_duty_cycle = 0.0f;    // Initial duty cycle
+
+// PID control parameters
+float Kp = 0.0001;
+float Ki = 0.0000;
+float Kd = 0.0000;
+
+float filtered_rpm = 0.0f;
+
+float prev_error = 0.0;
+float integral = 0.0;
+
+const float integral_max = 500.0;
+const float integral_min = -500.0;
+const int MAX_RPM = 1800; // Maximum RPM corresponding to 100% duty cycle
+const float MIN_DUTY_CYCLE = 0.01f;
+
+volatile float open_duty_cycle = 0;
+
+Mutex lcd_mutex;
+
 // Custom clamp function
 template <typename T>
 T clamp(T value, T min_val, T max_val) {
@@ -30,27 +55,7 @@ DigitalIn button(BUTTON1);
 Timer rpm_timer, print_timer;
 FanMode current_mode = OFF;
 
-volatile int pulse_count = 0;       // Counts tachometer pulses
-volatile int pulse_per_second = 0;  // Pulses in the last second
-volatile int target_rpm = 1000;     // Initial target RPM
-int last_encoder_value = 0;         // Last known encoder position
-float current_duty_cycle = 0.0f;    // Initial duty cycle
 
-// PID control parameters
-float Kp = 0.0001;
-float Ki = 0.0001;
-float Kd = 0.0001;
-
-float filtered_rpm = 0.0f;
-
-float prev_error = 0.0;
-float integral = 0.0;
-
-const float integral_max = 500.0;
-const float integral_min = -500.0;
-const int MAX_RPM = 1800; // Maximum RPM corresponding to 100% duty cycle
-
-Mutex lcd_mutex;
 
 // Tachometer pulse counting logic
 void count_pulse() {
@@ -92,11 +97,20 @@ int calculate_rpm() {
     }
 }
 
+void start_fan() 
+{
+    fan.write(0.5f);
+    ThisThread::sleep_for(500ms);  // Wait for 500ms
+    fan.write(MIN_DUTY_CYCLE);  // Drop to minimum duty cycle
+}
+
 // Update fan speed based on duty cycle
 void update_fan_speed(float duty_cycle) {
-    duty_cycle = clamp(duty_cycle, 0.0f, 1.0f);
+    //duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
     fan.write(duty_cycle);
 
+
+    /*
     static float current_time = 0.0f;  // Time within the PWM period
     const float pwm_period = 1.0f;    // PWM period in seconds
 
@@ -106,6 +120,9 @@ void update_fan_speed(float duty_cycle) {
 
     // pwm_sync is true for the portion of time corresponding to the duty cycle
     pwm_sync = (current_time < duty_cycle * pwm_period) ? 1 : 0;
+    */
+
+    //printf("current duty cycle: %.2f\n", duty_cycle);
 }
 
 // Function to safely write to the LCD
@@ -127,21 +144,23 @@ void safe_lcd_write(const char* text, int line) {
 }
 
 // Update rotary encoder target RPM
-void calc_target_rpm() {
+int calc_target_rpm() {
     int encoder_value = encoder.Get();          // Read encoder position
     int encoder_diff = encoder_value - last_encoder_value; // Calculate change
+    static int local_target_rpm = 0;
 
     if (encoder_diff != 0) {
-        target_rpm += encoder_diff * 25; // Adjust RPM by 25 per encoder step
-        target_rpm = clamp(target_rpm, 0, MAX_RPM);
+        local_target_rpm += encoder_diff * 5; // Adjust RPM by 25 per encoder step
+        local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
         // Update LCD and log
         char buffer[16];
-        sprintf(buffer, "Target RPM: %d", target_rpm);
+        sprintf(buffer, "Target RPM: %d", local_target_rpm);
         safe_lcd_write(buffer, 0);
     }
 
     last_encoder_value = encoder_value; // Update last position
+    return local_target_rpm;
 }
 
 // Print serial output
@@ -159,28 +178,42 @@ void print_serial_output() {
 void handle_closed_loop_ctrl() {
     calc_target_rpm(); // Update target RPM
 
+    //static float pid_output =0;
+    //static int rpm = 0;
+    //static int error = 0;
+
+    //static float current_duty_cycle = 0;
     int rpm = calculate_rpm();
     int error = target_rpm - rpm;
 
     // PID calculations
-    float delta_t = 1.0f;
-    integral = clamp(integral + error * delta_t, integral_min, integral_max);
-    float derivative = (error - prev_error) / delta_t;
-    float pid_output = (Kp * error) + (Ki * integral) + (Kd * derivative);
+    //float delta_t = 1.0f;
+    //integral = clamp(integral + error * delta_t, integral_min, integral_max);
+    //float derivative = (error - prev_error) / delta_t;
+    float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.0f);
 
-    // Adjust duty cycle based on PID output
-    current_duty_cycle = clamp(current_duty_cycle + pid_output, 0.0f, 1.0f);
-    update_fan_speed(current_duty_cycle);
+    //current_duty_cycle += pid_output;
+    
+    //update_fan_speed(pid_output);
+
+    //printf("PID output: %.2f, current duty cycle: %.2f, error: %d, rpm: %d\n", pid_output, current_duty_cycle, error, rpm);
 
     prev_error = error;
 }
 
 // Open-loop control logic (no feedback)
 void handle_open_loop_ctrl() {
-    calc_target_rpm();  // Update target RPM
 
-    current_duty_cycle = (float)target_rpm / MAX_RPM;  // Simple open-loop control
-    update_fan_speed(clamp(current_duty_cycle, 0.0f, 1.0f));
+    static int t_rpm = 300;
+
+    t_rpm = calc_target_rpm();  // Update target RPM
+
+    open_duty_cycle = static_cast<float>(t_rpm) / MAX_RPM;  // Simple open-loop control
+    //update_fan_speed(clamp(current_duty_cycle, 0.0f, 1.0f));
+
+    update_fan_speed(open_duty_cycle);
+
+    //printf("Target RPM: %d, duty cycle: %.2f\n", t_rpm, open_duty_cycle);
 }
 
 // Auto mode (same as closed-loop)
@@ -227,7 +260,7 @@ void update_mode() {
 }
 
 int main() {
-    fan.period(0.05f);  // Set PWM period to 1ms (1kHz frequency)
+    fan.period(0.02f);  // Set PWM period to 1ms (1kHz frequency)
     fan.write(0.0f);     // Start with fan off
     pwm_sync = 0;        // Set PWM synchronization to low initially
 
@@ -248,6 +281,8 @@ int main() {
                 handle_closed_loop_ctrl();
                 break;
             case ENCDR_O_LOOP:
+                //kicking fan awake first
+                //start_fan();
                 handle_open_loop_ctrl();
                 break;
             case AUTO:
