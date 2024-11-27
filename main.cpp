@@ -178,7 +178,7 @@ int calc_target_rpm() {
     static int local_target_rpm = 0;
 
     if (encoder_diff != 0) {
-        local_target_rpm += encoder_diff * 25; // Adjust RPM by 25 per encoder step
+        local_target_rpm += encoder_diff * 1; // Adjust RPM by 25 per encoder step
         local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
         // Update LCD and log
@@ -254,6 +254,7 @@ void handle_open_loop_ctrl() {
 
 
     printf("Target RPM: %d, duty cycle: %.2f, current rpm: %d\n", t_rpm, open_duty_cycle, o_rpm);
+    ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
 }
 
 // Auto mode (same as closed-loop)
