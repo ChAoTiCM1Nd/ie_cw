@@ -64,20 +64,21 @@ void encoder_interrupt_handler() {
 }
 
 void count_pulse() {
-    static uint32_t last_edge_time = 0;
-    static bool last_state_rising = false;
-    uint32_t current_time = osKernelGetTickCount();
-    bool is_rising = fan_tacho.read();
+    static uint32_t last_fall_time = 0;  // Time of the last falling edge
+    uint32_t current_time = osKernelGetTickCount();  // Current kernel tick count (in ms)
 
-    if ((current_time - last_edge_time) > 5) {
-        if (is_rising != last_state_rising) {
-            pulse_count++;
-            //printf("Pulse Count: %d, Time Between Pulses: %lu ms\n", pulse_count, current_time - last_edge_time);
-            last_edge_time = current_time;
-            last_state_rising = is_rising;
-        }
+    // Calculate the time difference between the current and last falling edges
+    uint32_t elapsed_time = current_time - last_fall_time;
+
+    // Restart the timer (update the last falling edge time)
+    last_fall_time = current_time;
+
+    // Only count a pulse if the elapsed time is greater than 15 ms
+    if (elapsed_time > 15) {
+        pulse_count++;  // Increment pulse count
     }
 }
+
 
 
 int calculate_rpm() {
@@ -91,7 +92,7 @@ int calculate_rpm() {
         int rpm;
         {
             CriticalSectionLock lock; // Prevent interrupt interference
-            rpm = (pulse_count * 15); // Calculate RPM
+            rpm = (pulse_count * 30); // Calculate RPM
             pulse_count = 0; // Reset pulse count for next calculation
         }
         last_calc_time = current_time1; // Update the last calculation time
@@ -229,7 +230,7 @@ void update_mode() {
 }
 
 int main() {
-    fan.period(0.002f);  // Set PWM period to 1ms (1kHz frequency)
+    fan.period(0.005f);  // Set PWM period to 1ms (1kHz frequency)
     fan.write(0.0f);     // Start with fan off
 
     safe_lcd_write("M: OFF", 0); // Display initial mode
