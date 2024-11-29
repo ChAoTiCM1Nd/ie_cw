@@ -1,6 +1,7 @@
 #include "mbed.h"
 #include "LCD_ST7066U.h"
 #include "mRotaryEncoder.h"
+#include <cmath> // For mathematical operations
 
 // Global variables and constants
 volatile int pulse_count = 0;       // Counts tachometer pulses
@@ -24,7 +25,7 @@ const float integral_min = -500.0;
 const int MAX_RPM = 1850; // Maximum RPM corresponding to 100% duty cycle
 const float MIN_DUTY_CYCLE = 0.01f;
 
-volatile float open_duty_cycle = 0;
+volatile float open_duty_cycle = 0.3;
 volatile int global_rpm = 0; // Global variable for the RPM of the fan
 
 Mutex lcd_mutex;
@@ -38,7 +39,7 @@ T clamp(T value, T min_val, T max_val) {
 }
 
 LCD lcd(PB_15, PB_14, PB_10, PA_8, PB_2, PB_1); // Instantiated LCD
-mRotaryEncoder encoder(PA_1, PA_4, NC, PullUp, 2000, 1, 1); // Rotary encoder setup
+mRotaryEncoder encoder(PA_1, PA_4, NC, PullUp, 200, 1, 0); // Rotary encoder setup
 
 enum FanMode {
     OFF,
@@ -133,8 +134,23 @@ int calc_target_rpm() {
     int encoder_diff = encoder_value - last_encoder_value; // Calculate change
     static int local_target_rpm = 0;
 
+    // Calculate step size based on the target RPM
+    // The step size decreases as RPM decreases, allowing finer control at lower speeds
+    float rpm_scaling_factor = 1.0f;
+
+    if (local_target_rpm < 50) {
+        rpm_scaling_factor = 0.1f; // Fine adjustments for low RPM
+    } else if (local_target_rpm < 200) {
+        rpm_scaling_factor = 0.2f; // Fine adjustments for low RPM
+    } else if (local_target_rpm < 500) {
+        rpm_scaling_factor = 0.5f; // Fine adjustments for low RPM
+    } else if (local_target_rpm < 1000) {
+        rpm_scaling_factor = 1.0f; // Moderate adjustments
+    }
+
+    // Adjust target RPM based on encoder change and scaling factor
     if (encoder_diff != 0) {
-        local_target_rpm += encoder_diff * 10; // Adjust RPM by 25 per encoder step
+        local_target_rpm += static_cast<int>(encoder_diff * 10 * rpm_scaling_factor); // Adjust RPM based on scaled encoder change
         local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
         // Update LCD and log
@@ -146,6 +162,7 @@ int calc_target_rpm() {
     last_encoder_value = encoder_value; // Update last position
     return local_target_rpm;
 }
+
 
 // Closed-loop control logic
 void handle_closed_loop_ctrl() {
@@ -198,7 +215,7 @@ void handle_closed_loop_ctrl() {
     
 }
 
-#include <cmath> // For exp function
+
 
 void handle_open_loop_ctrl() {
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
@@ -208,8 +225,8 @@ void handle_open_loop_ctrl() {
 
     t_rpm = calc_target_rpm(); // Update target RPM
 
-    // Apply the new equation: y = 0.0931 * e^(0.0013 * x)
-    float duty_cycle = 0.0931f * exp(0.0013f * t_rpm);
+    // Apply the new quadratic equation: y = 2E-07x^2 + 2E-05x + 0.1063
+    float duty_cycle = (2e-7f * t_rpm * t_rpm) + (1e-4f * t_rpm) + 0.07;
 
     // Clamp the duty cycle to a reasonable range (0.0 to 1.0 or within any hardware limits)
     open_duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
