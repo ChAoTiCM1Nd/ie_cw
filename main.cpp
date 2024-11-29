@@ -162,7 +162,6 @@ void handle_closed_loop_ctrl() {
 }
 
 void handle_open_loop_ctrl() {
-    fan_tacho.rise(&count_pulse); // Set tachometer interrupt
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
 
     static int t_rpm = 0;
@@ -230,14 +229,13 @@ void update_mode() {
 }
 
 int main() {
-    fan.period(0.005f);  // Set PWM period to 1ms (1kHz frequency)
+    fan.period(0.005f);  // Set PWM period 200Hz frequency
     fan.write(0.0f);     // Start with fan off
 
     safe_lcd_write("M: OFF", 0); // Display initial mode
     rpm_timer.start();  // Start RPM timer
     print_timer.start(); // Start serial print timer
 
-    fan_tacho.rise(&count_pulse); // Set tachometer interrupt
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
     
 
@@ -267,4 +265,3 @@ int main() {
         ThisThread::sleep_for(10ms);
     }
 }
-
