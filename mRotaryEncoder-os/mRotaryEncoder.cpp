@@ -92,3 +92,4 @@ void mRotaryEncoder::rise(void) {
     }
 }
 
+
