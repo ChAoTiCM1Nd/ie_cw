@@ -11,7 +11,7 @@ volatile float current_duty_cycle = 0.0f;    // Initial duty cycle
 volatile bool encoder_flag = false;
 
 // PID control parameters
-float Kp = 0.0001;
+float Kp = 0.000041;
 float Ki = 0.0000;
 float Kd = 0.0000;
 
@@ -134,7 +134,7 @@ int calc_target_rpm() {
     static int local_target_rpm = 0;
 
     if (encoder_diff != 0) {
-        local_target_rpm += encoder_diff * 5; // Adjust RPM by 25 per encoder step
+        local_target_rpm += encoder_diff * 25; // Adjust RPM by 25 per encoder step
         local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
         // Update LCD and log
@@ -149,16 +149,53 @@ int calc_target_rpm() {
 
 // Closed-loop control logic
 void handle_closed_loop_ctrl() {
-    static int c_target_rpm = 0;
+
+    static uint32_t last_iteration = 0;  // Time of the last falling edge
+    uint32_t current_time2 = osKernelGetTickCount();  // Current kernel tick count (in ms)
+
+    // Calculate the time difference between the current and last falling edges
+    uint32_t elapsed_time = current_time2 - last_iteration;
+
+    fan_tacho.fall(&count_pulse); // Set tachometer interrupt
+
+    static int valid_rpm = 0;
+    //fan_tacho.fall(&count_pulse); // Set tachometer interrupt
+    static int c_target_rpm = 800;
 
     c_target_rpm = calc_target_rpm(); // Update target RPM
-    int rpm = calculate_rpm();
-    int error = c_target_rpm - rpm;
 
-    // PID calculations
-    float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.0f);
-    update_fan_speed(pid_output);
-    prev_error = error;
+    
+
+    if (elapsed_time >= 1000)
+    {
+
+        int rpm = calculate_rpm();
+
+        if (rpm > 0)
+        {
+            valid_rpm = rpm;
+        }
+        int error = c_target_rpm - valid_rpm;
+        if (error < 40) error = 0;
+
+        // PID calculations
+        float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.0f);
+        
+
+        current_duty_cycle += pid_output;
+
+        update_fan_speed(current_duty_cycle);
+
+
+        
+        
+        prev_error = error;
+
+        printf("Current pid output: %.2f, current duty cycle: %.2f, error: %d, rpm: %d\n", pid_output, current_duty_cycle, error, valid_rpm);
+        last_iteration = current_time2;
+    }
+    
+    
 }
 
 void handle_open_loop_ctrl() {
