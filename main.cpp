@@ -134,7 +134,7 @@ int calc_target_rpm() {
     static int local_target_rpm = 0;
 
     if (encoder_diff != 0) {
-        local_target_rpm += encoder_diff * 25; // Adjust RPM by 25 per encoder step
+        local_target_rpm += encoder_diff * 10; // Adjust RPM by 25 per encoder step
         local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
         // Update LCD and log
@@ -198,17 +198,24 @@ void handle_closed_loop_ctrl() {
     
 }
 
+#include <cmath> // For exp function
+
 void handle_open_loop_ctrl() {
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
 
     static int t_rpm = 0;
     static int last_pulse_count = 0;
-    
-    t_rpm = calc_target_rpm(); // Update target RPM
-    open_duty_cycle = static_cast<float>(t_rpm) / MAX_RPM; // Calculate duty cycle
-    global_dc = open_duty_cycle;
 
-    update_fan_speed(open_duty_cycle);
+    t_rpm = calc_target_rpm(); // Update target RPM
+
+    // Apply the new equation: y = 0.0931 * e^(0.0013 * x)
+    float duty_cycle = 0.0931f * exp(0.0013f * t_rpm);
+
+    // Clamp the duty cycle to a reasonable range (0.0 to 1.0 or within any hardware limits)
+    open_duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
+    global_dc = open_duty_cycle; // Update the global duty cycle variable
+
+    update_fan_speed(open_duty_cycle); // Update fan speed with the new duty cycle
     global_rpm = calculate_rpm(); // Calculate and update the global RPM variable
 
     // Calculate pulses per second
@@ -224,6 +231,8 @@ void handle_open_loop_ctrl() {
 
     ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
 }
+
+
 
 void handle_auto_ctrl() {
     handle_closed_loop_ctrl();
