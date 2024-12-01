@@ -48,6 +48,7 @@ enum FanMode {
     AUTO
 };
 
+DigitalOut led_2(PC_0);             //LED on external header.
 DigitalOut led(LED1);
 PwmOut fan(PB_0);                   // PWM control for the fan
 InterruptIn fan_tacho(PA_0);        // Tachometer input to count pulses
@@ -80,7 +81,14 @@ void count_pulse() {
     }
 }
 
+""" Saad Notes 01/12/24
 
+Gonna jot these here before I forget. I spoke to some guys in the lab, and they were using a rather unique method. What they did was
+they, instead of only calculating the RPM every second, they calculated it much more frequently, using elapsed times. Issue with ours is that the rpm
+is always a multiple of 30, so when the rpm is low, it fluctuates a lot, and when it's high, it's much more stable. They used a much more
+stable method, and they were able to control the rpm much more precisely.
+
+"""
 
 int calculate_rpm() {
     static uint32_t last_calc_time = 0;
@@ -162,6 +170,8 @@ int calc_target_rpm() {
     last_encoder_value = encoder_value; // Update last position
     return local_target_rpm;
 }
+
+
 
 
 // Closed-loop control logic
