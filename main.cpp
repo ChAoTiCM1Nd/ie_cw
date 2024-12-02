@@ -80,15 +80,15 @@ void count_pulse() {
         pulse_count++;  // Increment pulse count
     }
 }
-
-""" Saad Notes 01/12/24
+/*
+ Saad Notes 01/12/24
 
 Gonna jot these here before I forget. I spoke to some guys in the lab, and they were using a rather unique method. What they did was
 they, instead of only calculating the RPM every second, they calculated it much more frequently, using elapsed times. Issue with ours is that the rpm
 is always a multiple of 30, so when the rpm is low, it fluctuates a lot, and when it's high, it's much more stable. They used a much more
 stable method, and they were able to control the rpm much more precisely.
+*/
 
-"""
 
 int calculate_rpm() {
     static uint32_t last_calc_time = 0;
@@ -127,9 +127,13 @@ void safe_lcd_write(const char* text, int line) {
         strncpy(last_text[line], text, 16);      // Update the stored text
         last_text[line][16] = '\0';              // Ensure null termination
 
-        char padded_text[17] = { ' ' };          // Create a blank-padded string
-        strncpy(padded_text, text, 16);          // Copy the text to the padded string
+        char padded_text[17];          // Create a blank-padded string
+        memset(padded_text, ' ', 16); // Fill with spaces
+        //strncpy(padded_text, text, 16);          // Copy the text to the padded string
         padded_text[16] = '\0';                  // Ensure null termination
+
+        // Copy the new text into the padded_text buffer
+        strncpy(padded_text, text, strlen(text));
 
         lcd.writeLine(padded_text, line);        // Write the padded string to the LCD
     }
@@ -164,7 +168,7 @@ int calc_target_rpm() {
         // Update LCD and log
         char buffer[16];
         sprintf(buffer, "Target RPM: %d", local_target_rpm);
-        safe_lcd_write(buffer, 0);
+        safe_lcd_write(buffer, 1);
     }
 
     last_encoder_value = encoder_value; // Update last position
@@ -186,7 +190,6 @@ void handle_closed_loop_ctrl() {
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
 
     static int valid_rpm = 0;
-    //fan_tacho.fall(&count_pulse); // Set tachometer interrupt
     static int c_target_rpm = 800;
 
     c_target_rpm = calc_target_rpm(); // Update target RPM
