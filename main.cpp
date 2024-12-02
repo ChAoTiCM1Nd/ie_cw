@@ -64,45 +64,73 @@ void encoder_interrupt_handler() {
     // Perform minimal operations here (e.g., debouncing logic)
 }
 
+
+volatile uint32_t start_time = 0;        // Time when counting starts
+volatile uint32_t end_time = 0;          // Time when counting ends
+volatile bool rpm_ready = false;         // Flag indicating RPM is ready to be calculated
+
+
+
 void count_pulse() {
     static uint32_t last_fall_time = 0;  // Time of the last falling edge
-    uint32_t current_time = osKernelGetTickCount();  // Current kernel tick count (in ms)
+    uint32_t current_time = osKernelGetTickCount();  // Current kernel tick count in ms
 
     // Calculate the time difference between the current and last falling edges
     uint32_t elapsed_time = current_time - last_fall_time;
 
-    // Restart the timer (update the last falling edge time)
-    last_fall_time = current_time;
+    last_fall_time = current_time;  // Update the last falling edge time
 
-    // Only count a pulse if the elapsed time is greater than 15 ms
+    // Only process the pulse if the elapsed time is greater than 15 ms (debouncing)
     if (elapsed_time > 15) {
+        
+        if (pulse_count == 0) {
+            start_time = current_time;  // Record the start time only when pulse_count is zero
+        }
+
         pulse_count++;  // Increment pulse count
+
+        if (pulse_count == 4) {         // If 4 pulses have been counted
+            end_time = current_time;    // Record the end time
+            rpm_ready = true;           // Set flag indicating RPM can be calculated
+            pulse_count = 0;            // Reset pulse count for the next measurement
+        }
     }
 }
-
-
 
 int calculate_rpm() {
-    static uint32_t last_calc_time = 0;
     static int last_rpm = 0;
 
-    uint32_t current_time1 = osKernelGetTickCount(); // Current time in ms
-    uint32_t time_diff = current_time1 - last_calc_time; // Time difference in ms
+    // Local copies of shared variables to prevent data inconsistency
+    uint32_t local_start_time = 0, local_end_time = 0;
+    bool local_rpm_ready = false;
 
-    if (time_diff >= 1000) { // Calculate RPM every second (1000 ms)
-        int rpm;
-        {
-            CriticalSectionLock lock; // Prevent interrupt interference
-            rpm = (pulse_count * 30); // Calculate RPM
-            pulse_count = 0; // Reset pulse count for next calculation
+    // Safely copy shared variables with interrupts disabled
+    {
+        CriticalSectionLock lock; // Disable interrupts during copy
+        local_rpm_ready = rpm_ready;
+        if (rpm_ready) {
+            local_start_time = start_time;
+            local_end_time = end_time;
+            rpm_ready = false;  // Reset the flag
         }
-        last_calc_time = current_time1; // Update the last calculation time
-
-        return rpm > 50 ? rpm : 0; // Filter out low RPM values (less than 50)
     }
 
-    return last_rpm; // Return the last valid RPM if a second hasn't passed
+    if (local_rpm_ready) {
+        uint32_t time_diff_ms = local_end_time - local_start_time;  // Time for 4 pulses in ms
+
+        if (time_diff_ms > 0) {
+            // Assuming 2 pulses per revolution
+            // RPM = (2 revolutions * 60000 ms per minute) / time_diff_ms
+            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f) * 0.75;  // Calculate RPM and round
+
+            last_rpm = rpm;
+            return rpm;
+        }
+    }
+
+    return last_rpm;  // Return the last valid RPM if no new data
 }
+
 
 
 // Update fan speed based on duty cycle
@@ -132,7 +160,7 @@ void safe_lcd_write(const char* text, int line) {
 int calc_target_rpm() {
     int encoder_value = encoder.Get();          // Read encoder position
     int encoder_diff = encoder_value - last_encoder_value; // Calculate change
-    static int local_target_rpm = 0;
+    static int local_target_rpm = 119;
 
     // Calculate step size based on the target RPM
     // The step size decreases as RPM decreases, allowing finer control at lower speeds
@@ -220,7 +248,7 @@ void handle_closed_loop_ctrl() {
 void handle_open_loop_ctrl() {
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
 
-    static int t_rpm = 0;
+    static int t_rpm = 119;
     static int last_pulse_count = 0;
 
     t_rpm = calc_target_rpm(); // Update target RPM
@@ -236,14 +264,12 @@ void handle_open_loop_ctrl() {
     global_rpm = calculate_rpm(); // Calculate and update the global RPM variable
 
     // Calculate pulses per second
-    int pulse_diff = pulse_count - last_pulse_count;
-    pulse_per_second = pulse_diff; // Update pulses per second
 
     last_pulse_count = pulse_count; // Store the current pulse count for the next cycle
 
     if (global_rpm > 0) {
-        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d, Pulses/Second: %d\n", 
-               t_rpm, open_duty_cycle, global_rpm, pulse_per_second);
+        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d\n", 
+               t_rpm, open_duty_cycle, global_rpm);
     }
 
     ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
