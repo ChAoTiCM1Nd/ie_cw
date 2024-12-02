@@ -67,8 +67,8 @@ void encoder_interrupt_handler() {
 
 volatile uint32_t start_time = 0;        // Time when counting starts
 volatile uint32_t end_time = 0;          // Time when counting ends
-volatile bool rpm_ready = false;         // Flag indicating RPM is ready to be calculated
-
+volatile uint32_t last_pulse_time = 0;   // Time when the last pulse was received
+volatile bool rpm_ready = false;   
 
 
 void count_pulse() {
@@ -79,6 +79,7 @@ void count_pulse() {
     uint32_t elapsed_time = current_time - last_fall_time;
 
     last_fall_time = current_time;  // Update the last falling edge time
+    last_pulse_time = current_time;
 
     // Only process the pulse if the elapsed time is greater than 15 ms (debouncing)
     if (elapsed_time > 15) {
@@ -101,8 +102,11 @@ int calculate_rpm() {
     static int last_rpm = 0;
 
     // Local copies of shared variables to prevent data inconsistency
-    uint32_t local_start_time = 0, local_end_time = 0;
+    uint32_t local_start_time = 0, local_end_time = 0, local_last_pulse_time = 0;
     bool local_rpm_ready = false;
+
+    uint32_t current_time = osKernelGetTickCount(); // Current time in ms
+
 
     // Safely copy shared variables with interrupts disabled
     {
@@ -113,6 +117,14 @@ int calculate_rpm() {
             local_end_time = end_time;
             rpm_ready = false;  // Reset the flag
         }
+         local_last_pulse_time = last_pulse_time;
+    }
+
+    uint32_t time_since_last_pulse = current_time - local_last_pulse_time;
+    if (time_since_last_pulse > 300) { // Adjust the threshold as needed
+        // No pulses received for longer than the threshold; set RPM to zero
+        last_rpm = 0;
+        return 0;
     }
 
     if (local_rpm_ready) {
@@ -121,7 +133,7 @@ int calculate_rpm() {
         if (time_diff_ms > 0) {
             // Assuming 2 pulses per revolution
             // RPM = (2 revolutions * 60000 ms per minute) / time_diff_ms
-            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f) * 0.75;  // Calculate RPM and round
+            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms) * 0.75;  // Calculate RPM and round
 
             last_rpm = rpm;
             return rpm;
@@ -160,7 +172,7 @@ void safe_lcd_write(const char* text, int line) {
 int calc_target_rpm() {
     int encoder_value = encoder.Get();          // Read encoder position
     int encoder_diff = encoder_value - last_encoder_value; // Calculate change
-    static int local_target_rpm = 119;
+    static int local_target_rpm = 0;
 
     // Calculate step size based on the target RPM
     // The step size decreases as RPM decreases, allowing finer control at lower speeds
@@ -248,7 +260,7 @@ void handle_closed_loop_ctrl() {
 void handle_open_loop_ctrl() {
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
 
-    static int t_rpm = 119;
+    static int t_rpm = 0;
     static int last_pulse_count = 0;
 
     t_rpm = calc_target_rpm(); // Update target RPM
