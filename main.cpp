@@ -153,13 +153,13 @@ void safe_lcd_write(const char* text, int line) {
     static char last_text[2][17] = { "", "" }; // Adjust size for two lines, 16 chars + null terminator
 
     lcd_mutex.lock();
-    if (strncmp(last_text[line], text, 16) != 0) { // Compare with last written text
-        strncpy(last_text[line], text, 16);      // Update the stored text
-        last_text[line][16] = '\0';              // Ensure null termination
+    if (strncmp(last_text[line], text, 16) != 0) {      // Compare with last written text
+        strncpy(last_text[line], text, 16);             // Update the stored text
+        last_text[line][16] = '\0';                     // Ensure null termination
 
-        char padded_text[17];          // Create a blank-padded string
-        memset(padded_text, ' ', 16); // Fill with spaces
-        padded_text[16] = '\0';                  // Ensure null termination
+        char padded_text[17];                           // Create a blank-padded string
+        memset(padded_text, ' ', 16);                   // Fill with spaces
+        padded_text[16] = '\0';                         // Ensure null termination
 
         // Copy the new text into the padded_text buffer
         strncpy(padded_text, text, strlen(text));
@@ -171,15 +171,15 @@ void safe_lcd_write(const char* text, int line) {
 
 // Update rotary encoder target RPM
 int calc_target_rpm() {
-    int encoder_value = encoder.Get();          // Read encoder position
-    int encoder_diff = encoder_value - last_encoder_value; // Calculate change
-    //static int local_target_rpm = 0;
 
     static int local_target_rpm = 119;
 
     // Calculate step size based on the target RPM
     // The step size decreases as RPM decreases, allowing finer control at lower speeds
     static float rpm_scaling_factor = 0;
+
+    int encoder_value = encoder.Get();          // Read encoder position
+    int encoder_diff = encoder_value - last_encoder_value; // Calculate change
 
     
     if (local_target_rpm < 50) {
