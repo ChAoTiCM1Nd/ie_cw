@@ -90,7 +90,7 @@ void count_pulse() {
 
         pulse_count++;  // Increment pulse count
 
-        if (pulse_count == 4) {         // If 4 pulses have been counted
+        if (pulse_count == 5) {         // If 4 pulses have been counted
             end_time = current_time;    // Record the end time
             rpm_ready = true;           // Set flag indicating RPM can be calculated
             pulse_count = 0;            // Reset pulse count for the next measurement
@@ -125,7 +125,7 @@ int calculate_rpm() {
         if (time_diff_ms > 0) {
             // Assuming 2 pulses per revolution
             // RPM = (2 revolutions * 60000 ms per minute) / time_diff_ms
-            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f) * 0.75;
+            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f);
 
             last_rpm = rpm;
             last_calculation_time = current_time; // Update the time of the last RPM calculation
