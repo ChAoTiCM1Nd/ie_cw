@@ -105,15 +105,6 @@ void count_pulse() {
         }
     }
 }
-/*
- Saad Notes 01/12/24
-
-Gonna jot these here before I forget. I spoke to some guys in the lab, and they were using a rather unique method. What they did was
-they, instead of only calculating the RPM every second, they calculated it much more frequently, using elapsed times. Issue with ours is that the rpm
-is always a multiple of 30, so when the rpm is low, it fluctuates a lot, and when it's high, it's much more stable. They used a much more
-stable method, and they were able to control the rpm much more precisely.
-*/
-
 
 int calculate_rpm() {
  
@@ -168,7 +159,6 @@ void safe_lcd_write(const char* text, int line) {
 
         char padded_text[17];          // Create a blank-padded string
         memset(padded_text, ' ', 16); // Fill with spaces
-        //strncpy(padded_text, text, 16);          // Copy the text to the padded string
         padded_text[16] = '\0';                  // Ensure null termination
 
         // Copy the new text into the padded_text buffer
@@ -189,9 +179,9 @@ int calc_target_rpm() {
 
     // Calculate step size based on the target RPM
     // The step size decreases as RPM decreases, allowing finer control at lower speeds
-    float rpm_scaling_factor = 3.0f;
+    static float rpm_scaling_factor = 0;
 
-    /*
+    
     if (local_target_rpm < 50) {
         rpm_scaling_factor = 0.1f; // Fine adjustments for low RPM
 
@@ -201,7 +191,7 @@ int calc_target_rpm() {
         rpm_scaling_factor = 0.5f; // Fine adjustments for low RPM
     } else if (local_target_rpm < 1000) {
         rpm_scaling_factor = 1.0f; // Moderate adjustments
-    }*/
+    }
 
     // Adjust target RPM based on encoder change and scaling factor
     if (encoder_diff != 0) {
@@ -225,17 +215,10 @@ void handle_closed_loop_ctrl() {
     static int c_target_rpm = 800;
     static bool timer_started = false;
 
-    
-
-    //static int rpm = 0;
     // Update target RPM from encoder
     c_target_rpm = calc_target_rpm();
     // Read current RPM (ensure calculate_rpm() returns a float)
     int rpm = calculate_rpm();
-    //if (rtos_rpm > 0)
-    //{
-    //    rpm = rtos_rpm;
-    //} 
     
     if (!timer_started) {
         control_timer.start();
@@ -260,52 +243,9 @@ void handle_closed_loop_ctrl() {
 
         // Update fan speed
         update_fan_speed(duty_cycle);
-
-        // Debugging output
         
     }
 }
-/*
-// Closed-loop control logic, currently archived
-void handle_closed_loop_ctrl_old() {
-
-    static uint32_t last_iteration = 0;  // Time of the last falling edge
-    uint32_t current_time2 = osKernelGetTickCount();  // Current kernel tick count (in ms)
-
-    // Calculate the time difference between the current and last falling edges
-    uint32_t elapsed_time = current_time2 - last_iteration;
-
-    fan_tacho.fall(&count_pulse); // Set tachometer interrupt
-    static int valid_rpm = 0;
-    static int c_target_rpm = 800;
-
-    c_target_rpm = calc_target_rpm(); // Update target RPM
-    if (elapsed_time >= 1000)
-    {
-        int rpm = calculate_rpm();
-
-        if (rpm > 0)
-        {
-            valid_rpm = rpm;
-        }
-        int error = c_target_rpm - valid_rpm;
-        if (error < 40) error = 0;
-        // PID calculations
-        float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.0f);
-    
-        current_duty_cycle += pid_output;
-
-        update_fan_speed(current_duty_cycle);
-        prev_error = error;
-
-        printf("Current pid output: %.2f, current duty cycle: %.2f, error: %d, rpm: %d\n", pid_output, current_duty_cycle, error, valid_rpm);
-        last_iteration = current_time2;
-    }
-    
-    
-}
-*/
-
 
 void handle_open_loop_ctrl() {
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
