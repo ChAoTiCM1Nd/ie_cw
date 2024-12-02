@@ -2,6 +2,7 @@
 #include "LCD_ST7066U.h"
 #include "mRotaryEncoder.h"
 #include <cmath> // For mathematical operations
+#include "pid.h"
 
 // Global variables and constants
 volatile int pulse_count = 0;       // Counts tachometer pulses
@@ -25,11 +26,22 @@ const float integral_min = -500.0;
 const int MAX_RPM = 1850; // Maximum RPM corresponding to 100% duty cycle
 const float MIN_DUTY_CYCLE = 0.01f;
 
+const int starting_rpm = 800;
+
 volatile float open_duty_cycle = 0.3;
 volatile int global_rpm = 0; // Global variable for the RPM of the fan
 
-Mutex lcd_mutex;
 
+// PID parameters
+float Kc = 1.0;            // Proportional gain
+float tauI = 0.1f;          // Integral time constant (Ki), keep at zero for now
+float tauD = 0.0f;          // Derivative time constant (Kd), keep at zero for now
+float tSample = 0.1f;       // Sample interval in seconds (e.g., 0.1s for 100ms)
+
+// Create PID object
+PID pid(Kc, tauI, tauD, tSample);
+
+Mutex lcd_mutex;
 // Custom clamp function
 template <typename T>
 T clamp(T value, T min_val, T max_val) {
@@ -58,11 +70,13 @@ DigitalIn button(BUTTON1);
 Timer rpm_timer, print_timer;
 FanMode current_mode = OFF;
 
+volatile uint32_t start_time = 0;        // Time when counting starts
+volatile uint32_t end_time = 0;          // Time when counting ends
+volatile bool rpm_ready = false;         // Flag indicating RPM is ready to be calculated
 volatile float global_dc = 0;
 
 void encoder_interrupt_handler() {
     encoder_flag = true; // Set the flag
-    // Perform minimal operations here (e.g., debouncing logic)
 }
 
 void count_pulse() {
@@ -75,9 +89,20 @@ void count_pulse() {
     // Restart the timer (update the last falling edge time)
     last_fall_time = current_time;
 
-    // Only count a pulse if the elapsed time is greater than 15 ms
+    // Only process the pulse if the elapsed time is greater than 15 ms (debouncing)
     if (elapsed_time > 15) {
+
+        if (pulse_count == 0) {
+            start_time = current_time;  // Record the start time only when pulse_count is zero
+        }
+
         pulse_count++;  // Increment pulse count
+
+        if (pulse_count == 4) {         // If 4 pulses have been counted
+            end_time = current_time;    // Record the end time
+            rpm_ready = true;           // Set flag indicating RPM can be calculated
+            pulse_count = 0;            // Reset pulse count for the next measurement
+        }
     }
 }
 /*
@@ -91,25 +116,39 @@ stable method, and they were able to control the rpm much more precisely.
 
 
 int calculate_rpm() {
-    static uint32_t last_calc_time = 0;
+ 
     static int last_rpm = 0;
+    uint32_t local_start_time = 0, local_end_time = 0;
+    bool local_rpm_ready = false;
 
-    uint32_t current_time1 = osKernelGetTickCount(); // Current time in ms
-    uint32_t time_diff = current_time1 - last_calc_time; // Time difference in ms
+    // Safely copy shared variables with interrupts disabled
+    {
+        CriticalSectionLock lock; // Disable interrupts during copy
+        local_rpm_ready = rpm_ready;
 
-    if (time_diff >= 1000) { // Calculate RPM every second (1000 ms)
-        int rpm;
-        {
-            CriticalSectionLock lock; // Prevent interrupt interference
-            rpm = (pulse_count * 30); // Calculate RPM
-            pulse_count = 0; // Reset pulse count for next calculation
+        if (rpm_ready) {
+            local_start_time = start_time;
+            local_end_time = end_time;
+            rpm_ready = false;  // Reset the flag
         }
-        last_calc_time = current_time1; // Update the last calculation time
 
-        return rpm > 50 ? rpm : 0; // Filter out low RPM values (less than 50)
     }
 
-    return last_rpm; // Return the last valid RPM if a second hasn't passed
+    if (local_rpm_ready) {
+
+        uint32_t time_diff_ms = local_end_time - local_start_time;  // Time for 4 pulses in ms
+        if (time_diff_ms > 0) {
+            // Assuming 2 pulses per revolution
+            // RPM = (2 revolutions * 60000 ms per minute) / time_diff_ms
+            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f) * 0.75;  // Calculate RPM and round
+            last_rpm = rpm;
+            return rpm;
+        }
+    }
+
+    return last_rpm;  // Return the last valid RPM if no new data
+
+
 }
 
 
@@ -144,21 +183,25 @@ void safe_lcd_write(const char* text, int line) {
 int calc_target_rpm() {
     int encoder_value = encoder.Get();          // Read encoder position
     int encoder_diff = encoder_value - last_encoder_value; // Calculate change
-    static int local_target_rpm = 0;
+    //static int local_target_rpm = 0;
+
+    static int local_target_rpm = 119;
 
     // Calculate step size based on the target RPM
     // The step size decreases as RPM decreases, allowing finer control at lower speeds
-    float rpm_scaling_factor = 1.0f;
+    float rpm_scaling_factor = 3.0f;
 
+    /*
     if (local_target_rpm < 50) {
         rpm_scaling_factor = 0.1f; // Fine adjustments for low RPM
+
     } else if (local_target_rpm < 200) {
         rpm_scaling_factor = 0.2f; // Fine adjustments for low RPM
     } else if (local_target_rpm < 500) {
         rpm_scaling_factor = 0.5f; // Fine adjustments for low RPM
     } else if (local_target_rpm < 1000) {
         rpm_scaling_factor = 1.0f; // Moderate adjustments
-    }
+    }*/
 
     // Adjust target RPM based on encoder change and scaling factor
     if (encoder_diff != 0) {
@@ -176,10 +219,55 @@ int calc_target_rpm() {
 }
 
 
-
-
-// Closed-loop control logic
 void handle_closed_loop_ctrl() {
+
+    static Timer control_timer;
+    static int c_target_rpm = 800;
+    static bool timer_started = false;
+
+    
+
+    //static int rpm = 0;
+    // Update target RPM from encoder
+    c_target_rpm = calc_target_rpm();
+    // Read current RPM (ensure calculate_rpm() returns a float)
+    int rpm = calculate_rpm();
+    //if (rtos_rpm > 0)
+    //{
+    //    rpm = rtos_rpm;
+    //} 
+    
+    if (!timer_started) {
+        control_timer.start();
+        timer_started = true;
+    }
+
+    if (control_timer.elapsed_time().count() >= tSample * 1e6) {  // tSample in seconds, convert to microseconds
+        control_timer.reset();
+
+        
+        // Update PID controller
+        pid.setProcessValue(static_cast<float>(rpm));
+        pid.setSetPoint(static_cast<float>(c_target_rpm));
+
+        // Compute control output (duty cycle) 
+        float duty_cycle = pid.compute();
+
+        printf("Setpoint: %d RPM, RPM: %d, Duty Cycle: %.3f\n", c_target_rpm, rpm, duty_cycle);
+
+        // Clamp duty cycle
+        duty_cycle = clamp(duty_cycle, 0.0f, 1.0f);
+
+        // Update fan speed
+        update_fan_speed(duty_cycle);
+
+        // Debugging output
+        
+    }
+}
+/*
+// Closed-loop control logic, currently archived
+void handle_closed_loop_ctrl_old() {
 
     static uint32_t last_iteration = 0;  // Time of the last falling edge
     uint32_t current_time2 = osKernelGetTickCount();  // Current kernel tick count (in ms)
@@ -188,17 +276,12 @@ void handle_closed_loop_ctrl() {
     uint32_t elapsed_time = current_time2 - last_iteration;
 
     fan_tacho.fall(&count_pulse); // Set tachometer interrupt
-
     static int valid_rpm = 0;
     static int c_target_rpm = 800;
 
     c_target_rpm = calc_target_rpm(); // Update target RPM
-
-    
-
     if (elapsed_time >= 1000)
     {
-
         int rpm = calculate_rpm();
 
         if (rpm > 0)
@@ -207,18 +290,12 @@ void handle_closed_loop_ctrl() {
         }
         int error = c_target_rpm - valid_rpm;
         if (error < 40) error = 0;
-
         // PID calculations
         float pid_output = (Kp * error) + (Ki * 0.0f) + (Kd * 0.0f);
-        
-
+    
         current_duty_cycle += pid_output;
 
         update_fan_speed(current_duty_cycle);
-
-
-        
-        
         prev_error = error;
 
         printf("Current pid output: %.2f, current duty cycle: %.2f, error: %d, rpm: %d\n", pid_output, current_duty_cycle, error, valid_rpm);
@@ -227,7 +304,7 @@ void handle_closed_loop_ctrl() {
     
     
 }
-
+*/
 
 
 void handle_open_loop_ctrl() {
@@ -265,7 +342,8 @@ void handle_open_loop_ctrl() {
 
 
 void handle_auto_ctrl() {
-    handle_closed_loop_ctrl();
+    //handle_closed_loop_ctrl();
+    fan.write(0.0f);
 }
 
 void handle_off_ctrl() {
@@ -307,6 +385,10 @@ void update_mode() {
 int main() {
     fan.period(0.005f);  // Set PWM period 200Hz frequency
     fan.write(0.0f);     // Start with fan off
+
+    pid.setInputLimits(0.0f, MAX_RPM);  // MAX_RPM is 1850 in your code
+    pid.setOutputLimits(0.0f, 1.0f);    // Duty cycle ranges from 0.0 to 1.0
+    pid.setMode(1);  // 1 for automatic mode
 
     safe_lcd_write("M: OFF", 0); // Display initial mode
     rpm_timer.start();  // Start RPM timer
