@@ -100,13 +100,13 @@ void count_pulse() {
 
 int calculate_rpm() {
     static int last_rpm = 0;
+    static uint32_t last_calculation_time = 0; // Time when the last RPM was calculated
 
     // Local copies of shared variables to prevent data inconsistency
-    uint32_t local_start_time = 0, local_end_time = 0, local_last_pulse_time = 0;
+    uint32_t local_start_time = 0, local_end_time = 0;
     bool local_rpm_ready = false;
 
     uint32_t current_time = osKernelGetTickCount(); // Current time in ms
-
 
     // Safely copy shared variables with interrupts disabled
     {
@@ -117,14 +117,6 @@ int calculate_rpm() {
             local_end_time = end_time;
             rpm_ready = false;  // Reset the flag
         }
-         local_last_pulse_time = last_pulse_time;
-    }
-
-    uint32_t time_since_last_pulse = current_time - local_last_pulse_time;
-    if (time_since_last_pulse > 300) { // Adjust the threshold as needed
-        // No pulses received for longer than the threshold; set RPM to zero
-        last_rpm = 0;
-        return 0;
     }
 
     if (local_rpm_ready) {
@@ -133,16 +125,25 @@ int calculate_rpm() {
         if (time_diff_ms > 0) {
             // Assuming 2 pulses per revolution
             // RPM = (2 revolutions * 60000 ms per minute) / time_diff_ms
-            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms) * 0.75;  // Calculate RPM and round
+            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f) * 0.75;
 
             last_rpm = rpm;
+            last_calculation_time = current_time; // Update the time of the last RPM calculation
             return rpm;
         }
     }
 
-    return last_rpm;  // Return the last valid RPM if no new data
-}
+    // No new RPM calculation available
+    uint32_t time_since_last_calculation = current_time - last_calculation_time;
 
+    if (time_since_last_calculation > 400) { // Adjust the timeout threshold as needed
+        // No new RPM calculations for longer than the threshold; set RPM to zero
+        last_rpm = 0;
+        last_calculation_time = current_time; // Update last_calculation_time to reset the timeout
+    }
+
+    return last_rpm;  // Return the last known RPM or zero if timeout has occurred
+}
 
 
 // Update fan speed based on duty cycle
@@ -258,35 +259,46 @@ void handle_closed_loop_ctrl() {
 
 
 void handle_open_loop_ctrl() {
-    fan_tacho.fall(&count_pulse); // Set tachometer interrupt
+    // Remove the tachometer interrupt setup from here
+    // It's now set up once in main()
 
-    static int t_rpm = 0;
-    static int last_pulse_count = 0;
+    // Static variables to hold previous values for comparison
+    static int prev_t_rpm = -1;
+    static int prev_global_rpm = -1;
+    static int prev_duty_cycle_percent = -1; // Duty cycle stored as an integer percentage
 
-    t_rpm = calc_target_rpm(); // Update target RPM
+    // Update target RPM from the encoder
+    int t_rpm = calc_target_rpm(); // Ensure this returns a valid integer
 
-    // Apply the new quadratic equation: y = 2E-07x^2 + 2E-05x + 0.1063
-    float duty_cycle = (2e-7f * t_rpm * t_rpm) + (1e-4f * t_rpm) + 0.07;
+    // Apply the quadratic equation to calculate the duty cycle
+    float duty_cycle = (2e-7f * t_rpm * t_rpm) + (1e-4f * t_rpm) + 0.07f;
 
-    // Clamp the duty cycle to a reasonable range (0.0 to 1.0 or within any hardware limits)
+    // Clamp the duty cycle to a reasonable range (e.g., 0.0 to 1.0)
     open_duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
     global_dc = open_duty_cycle; // Update the global duty cycle variable
 
-    update_fan_speed(open_duty_cycle); // Update fan speed with the new duty cycle
-    global_rpm = calculate_rpm(); // Calculate and update the global RPM variable
+    // Update fan speed with the new duty cycle
+    update_fan_speed(open_duty_cycle);
 
-    // Calculate pulses per second
+    // Calculate and update the global RPM variable
+    int global_rpm = calculate_rpm();
 
-    last_pulse_count = pulse_count; // Store the current pulse count for the next cycle
+    // Convert duty cycle to an integer percentage for comparison
+    int duty_cycle_percent = static_cast<int>(open_duty_cycle * 100 + 0.5f); // Round to nearest integer
 
-    if (global_rpm > 0) {
-        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d\n", 
+    // Only print if any of the values have changed
+    if (t_rpm != prev_t_rpm || duty_cycle_percent != prev_duty_cycle_percent || global_rpm != prev_global_rpm) {
+        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d\n",
                t_rpm, open_duty_cycle, global_rpm);
+
+        // Update previous values
+        prev_t_rpm = t_rpm;
+        prev_duty_cycle_percent = duty_cycle_percent;
+        prev_global_rpm = global_rpm;
     }
 
     ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
 }
-
 
 
 void handle_auto_ctrl() {
