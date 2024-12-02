@@ -1,72 +1,177 @@
- ![](./resources/official_armmbed_example_badge.png)
-# Blinky Mbed OS example
-helo
-The example project is part of the [Arm Mbed OS Official Examples](https://os.mbed.com/code/) and is the [getting started example for Mbed OS](https://os.mbed.com/docs/mbed-os/latest/quick-start/index.html). It contains an application that repeatedly blinks an LED on supported [Mbed boards](https://os.mbed.com/platforms/).
+Fan Controller Mbed OS Example
+The example project is a fan controller system using the NUCLEO-F070RB board and Mbed OS. It demonstrates how to implement a variable-speed fan control system using PWM, rotary encoder input, LCD display, and PID control for closed-loop feedback. The system operates in multiple modes, including off, open-loop control, closed-loop control, and automatic temperature-based control.
 
-You can build the project with all supported [Mbed OS build tools](https://os.mbed.com/docs/mbed-os/latest/tools/index.html). However, this example project specifically refers to the command-line interface tool [Arm Mbed CLI](https://github.com/ARMmbed/mbed-cli#installing-mbed-cli).
-(Note: To see a rendered example you can import into the Arm Online Compiler, please see our [import quick start](https://os.mbed.com/docs/mbed-os/latest/quick-start/online-with-the-online-compiler.html#importing-the-code).)
+This project is intended for embedded systems applications and is suitable for use in standalone products without PC I/O.
 
-## Mbed OS build tools
+Mbed OS Build Tools
+Mbed CLI
+Install Mbed CLI:
 
-### Mbed CLI 2
-Starting with version 6.5, Mbed OS uses Mbed CLI 2. It uses Ninja as a build system, and CMake to generate the build environment and manage the build process in a compiler-independent manner. If you are working with Mbed OS version prior to 6.5 then check the section [Mbed CLI 1](#mbed-cli-1).
-1. [Install Mbed CLI 2](https://os.mbed.com/docs/mbed-os/latest/build-tools/install-or-upgrade.html).
-1. From the command-line, import the example: `mbed-tools import mbed-os-example-blinky`
-1. Change the current directory to where the project was imported.
+Follow the installation guide to install Mbed CLI on your system.
 
-### Mbed CLI 1
-1. [Install Mbed CLI 1](https://os.mbed.com/docs/mbed-os/latest/quick-start/offline-with-mbed-cli.html).
-1. From the command-line, import the example: `mbed import mbed-os-example-blinky`
-1. Change the current directory to where the project was imported.
+Import the Example:
 
-## Application functionality
+From the command line, run:
 
-The `main()` function is the single thread in the application. It toggles the state of a digital output connected to an LED on the board.
+bash
+Copy code
+mbed import https://github.com/yourusername/fan-controller.git
+Replace yourusername with your GitHub username if applicable.
 
-**Note**: This example requires a target with RTOS support, i.e. one with `rtos` declared in `supported_application_profiles` in `targets/targets.json` in [mbed-os](https://github.com/ARMmbed/mbed-os). For non-RTOS targets (usually with small memory sizes), please use [mbed-os-example-blinky-baremetal](https://github.com/ARMmbed/mbed-os-example-blinky-baremetal) instead.
+Change Directory:
 
-## Building and running
+Navigate to the imported project directory:
 
-1. Connect a USB cable between the USB port on the board and the host computer.
-1. Run the following command to build the example project and program the microcontroller flash memory:
+bash
+Copy code
+cd fan-controller
+Application Functionality
+The main() function initializes the system and enters a loop where it handles user input and controls the fan speed based on the selected mode. The application supports the following modes:
 
-    * Mbed CLI 2
+Off Mode: The fan is turned off.
+Open-Loop Control Mode: The fan speed is controlled directly via PWM without feedback.
+Closed-Loop Control Mode (PID): The fan speed is controlled using a PID controller to maintain a desired RPM.
+Automatic Mode: The fan speed is adjusted automatically based on input from a temperature sensor.
+Features
+Variable Fan Speed Control using a rotary encoder.
+LCD Display showing current mode and target RPM.
+Accurate RPM Measurement using tachometer input with microsecond precision.
+PID Control for precise closed-loop control of fan speed.
+User Interface: Mode selection via button presses.
+Safety Mechanisms: Timeout and debounce logic to ensure reliable operation.
+Building and Running
+Connect Hardware Components:
 
-    ```bash
-    $ mbed-tools compile -m <TARGET> -t <TOOLCHAIN> --flash
-    ```
+NUCLEO-F070RB Development Board.
+Extension Board for 12V fan control.
+12V Brushless DC Fan with tachometer output.
+Rotary Encoder connected to the specified pins.
+LCD Screen connected according to the pin configuration.
+Temperature Sensor (for automatic mode).
+Connect the Board to Your PC:
 
-    * Mbed CLI 1
+Use a USB cable to connect the Nucleo board to your PC.
+Compile the Example Project:
 
-    ```bash
-    $ mbed compile -m <TARGET> -t <TOOLCHAIN> --flash
-    ```
+Run the following command to build the project and program the microcontroller flash memory:
 
-Your PC may take a few minutes to compile your code.
+bash
+Copy code
+mbed compile -m NUCLEO_F070RB -t <TOOLCHAIN> --flash
+Replace <TOOLCHAIN> with your preferred toolchain (GCC_ARM, ARM, or IAR). Your PC may take a few minutes to compile your code.
 
-The binary is located at:
-* **Mbed CLI 2** - `./cmake_build/mbed-os-example-blinky.bin`</br>
-* **Mbed CLI 1** - `./BUILD/<TARGET>/<TOOLCHAIN>/mbed-os-example-blinky.bin`
+Flash the Binary:
 
-Alternatively, you can manually copy the binary to the board, which you mount on the host computer over USB.
+If not using the --flash option, you can manually copy the binary from:
 
-## Expected output
-The LED on your target turns on and off every 500 milliseconds.
+bash
+Copy code
+./BUILD/NUCLEO_F070RB/<TOOLCHAIN>/fan-controller.bin
+Copy the binary to the Nucleo board, which appears as a USB mass storage device.
 
+Expected Output
+The LCD displays the current mode and target RPM.
+The fan speed adjusts according to the selected mode and user inputs.
+In closed-loop mode, the PID controller maintains the desired RPM.
+In automatic mode, the fan speed changes based on the temperature sensor input.
+Serial output (optional) provides debugging information at a baud rate of 19200.
+Usage Instructions
+Select Mode:
 
-## Troubleshooting
-If you have problems, you can review the [documentation](https://os.mbed.com/docs/latest/tutorials/debugging.html) for suggestions on what could be wrong and how to fix it.
+Press the user button on the Nucleo board (BUTTON1) to cycle through the modes:
+M: OFF
+M: Open Loop
+M: Closed Loop
+M: AUTO
+Set Target RPM:
 
-## Related Links
+In Open Loop and Closed Loop modes, use the rotary encoder to adjust the target RPM.
+The target RPM is displayed on the LCD.
+Monitor Fan Speed:
 
-* [Mbed OS Stats API](https://os.mbed.com/docs/latest/apis/mbed-statistics.html).
-* [Mbed OS Configuration](https://os.mbed.com/docs/latest/reference/configuration.html).
-* [Mbed OS Serial Communication](https://os.mbed.com/docs/latest/tutorials/serial-communication.html).
-* [Mbed OS bare metal](https://os.mbed.com/docs/mbed-os/latest/reference/mbed-os-bare-metal.html).
-* [Mbed boards](https://os.mbed.com/platforms/).
+The system measures the actual fan RPM and can display it via serial output for debugging.
+Automatic Mode:
 
-### License and contributions
+In AUTO mode, the fan speed adjusts automatically based on the temperature sensor reading.
+Troubleshooting
+Fan Not Spinning:
 
-The software is provided under Apache-2.0 license. Contributions to this project are accepted under the same license. Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for more info.
+Ensure the fan is connected properly and the power supply is adequate.
+Check that the system is not in OFF mode.
+No LCD Display:
 
-This project contains code from other projects. The original license text is included in those source files. They must comply with our license guide.
+Verify connections to the LCD.
+Ensure the correct pins are configured in the code.
+Incorrect RPM Readings:
+
+Check the tachometer connection.
+Verify the number of pulses per revolution used in the RPM calculation matches the fan's specification.
+Oscillations in Closed-Loop Mode:
+
+Adjust the PID parameters (Kc, tauI, tauD) in the code to stabilize the control loop.
+Hardware Requirements
+NUCLEO-F070RB Board.
+12V Brushless DC Fan (3-wire with tachometer).
+Extension Board for driving the fan.
+Rotary Encoder for user input.
+LCD Screen for display.
+Temperature Sensor (optional for automatic mode).
+Push Button (onboard BUTTON1).
+LEDs (optional for status indication).
+Software Requirements
+Mbed OS (compatible with NUCLEO-F070RB).
+
+Mbed CLI.
+
+Libraries:
+
+LCD_ST7066U for LCD control.
+mRotaryEncoder for rotary encoder input.
+PID library for closed-loop control.
+Pin Configuration
+LCD:
+
+PB_15, PB_14, PB_10, PA_8, PB_2, PB_1
+Rotary Encoder:
+
+PA_1, PA_4
+Fan PWM Output:
+
+PB_0
+Fan Tachometer Input:
+
+PA_0
+Button:
+
+BUTTON1
+LEDs:
+
+LED1, PC_0
+Related Links
+Mbed OS Documentation
+NUCLEO-F070RB Board Information
+PID Control Theory
+Arm Mbed CLI
+License and Contributions
+The software is provided under the Apache-2.0 license. Contributions to this project are accepted under the same license. Please see CONTRIBUTING.md for more information.
+
+This project was developed as part of a coursework activity to build an understanding of programming an embedded processor-based system using C.
+
+Acknowledgments
+Coursework Guidance: Thanks to the instructional team for providing foundational materials and hardware schematics.
+Libraries Used:
+LCD_ST7066U
+mRotaryEncoder
+PID library adapted from Brett Beauregard's Arduino PID library.
+Notes
+Serial Communication: The serial port is configured with a baud rate of 19200 for debugging purposes.
+Safety Precautions:
+Ensure all power supplies match the required voltage levels.
+Double-check wiring connections before powering the system.
+Contributions
+Contributions are welcome. Please follow the standard guidelines for submitting issues and pull requests.
+
+Contact Information
+For any questions or support, please contact Your Name.
+
+Disclaimer: This project is intended for educational purposes as part of coursework and is not designed for commercial deployment.
