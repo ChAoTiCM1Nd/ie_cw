@@ -100,13 +100,13 @@ void count_pulse() {
 
 int calculate_rpm() {
     static int last_rpm = 0;
-    static uint32_t last_calculation_time = 0; // Time when the last RPM was calculated
+    static uint32_t last_calculation_time = 0; // Time of the last RPM calculation
+
+    uint32_t current_time = osKernelGetTickCount(); // Current time in ms
 
     // Local copies of shared variables to prevent data inconsistency
     uint32_t local_start_time = 0, local_end_time = 0;
     bool local_rpm_ready = false;
-
-    uint32_t current_time = osKernelGetTickCount(); // Current time in ms
 
     // Safely copy shared variables with interrupts disabled
     {
@@ -124,25 +124,22 @@ int calculate_rpm() {
 
         if (time_diff_ms > 0) {
             // Assuming 2 pulses per revolution
-            // RPM = (2 revolutions * 60000 ms per minute) / time_diff_ms
             int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f);
 
-            last_rpm = rpm;
-            last_calculation_time = current_time; // Update the time of the last RPM calculation
+            last_rpm = rpm; // Update the last valid RPM
+            last_calculation_time = current_time; // Update calculation time
             return rpm;
         }
     }
 
-    // No new RPM calculation available
+    // No new pulses received within a reasonable timeout
     uint32_t time_since_last_calculation = current_time - last_calculation_time;
-
-    if (time_since_last_calculation > 400) { // Adjust the timeout threshold as needed
-        // No new RPM calculations for longer than the threshold; set RPM to zero
-        last_rpm = 0;
-        last_calculation_time = current_time; // Update last_calculation_time to reset the timeout
+    if (time_since_last_calculation > 1000) { // Timeout: no pulses for 1 second
+        last_rpm = 0; // Set RPM to zero
+        last_calculation_time = current_time; // Prevent repeated resets
     }
 
-    return last_rpm;  // Return the last known RPM or zero if timeout has occurred
+    return last_rpm;
 }
 
 
