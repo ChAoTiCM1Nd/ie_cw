@@ -26,7 +26,7 @@ const int MAX_RPM = 1850; // Maximum RPM corresponding to 100% duty cycle
 const float MIN_DUTY_CYCLE = 0.01f;
 
 volatile float open_duty_cycle = 0.3;
-volatile int global_rpm = 0; // Global variable for the RPM of the fan
+//volatile int global_rpm = 0; // Global variable for the RPM of the fan
 
 Mutex lcd_mutex;
 
@@ -101,13 +101,11 @@ void count_pulse() {
 int calculate_rpm() {
     static int last_rpm = 0;
     static uint32_t last_calculation_time = 0; // Time of the last RPM calculation
-
     uint32_t current_time = osKernelGetTickCount(); // Current time in ms
 
     // Local copies of shared variables to prevent data inconsistency
     uint32_t local_start_time = 0, local_end_time = 0;
     bool local_rpm_ready = false;
-
     // Safely copy shared variables with interrupts disabled
     {
         CriticalSectionLock lock; // Disable interrupts during copy
@@ -192,9 +190,9 @@ int calc_target_rpm() {
         local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
         // Update LCD and log
-        char buffer[16];
-        sprintf(buffer, "Target RPM: %d", local_target_rpm);
-        safe_lcd_write(buffer, 0);
+        //char buffer[16];
+        //sprintf(buffer, "Target RPM: %d", local_target_rpm);
+        //safe_lcd_write(buffer, 0);
     }
 
     last_encoder_value = encoder_value; // Update last position
@@ -240,13 +238,12 @@ void handle_closed_loop_ctrl() {
         current_duty_cycle += pid_output;
 
         update_fan_speed(current_duty_cycle);
-
-
-        
         
         prev_error = error;
 
         printf("Current pid output: %.2f, current duty cycle: %.2f, error: %d, rpm: %d\n", pid_output, current_duty_cycle, error, valid_rpm);
+
+         
         last_iteration = current_time2;
     }
     
@@ -261,11 +258,13 @@ void handle_open_loop_ctrl() {
 
     // Static variables to hold previous values for comparison
     static int prev_t_rpm = -1;
-    static int prev_global_rpm = -1;
+    static int prev_o_rpm = -1;
     static int prev_duty_cycle_percent = -1; // Duty cycle stored as an integer percentage
+    static int t_rpm = 800;
+    static int global_rpm = 0;
 
     // Update target RPM from the encoder
-    int t_rpm = calc_target_rpm(); // Ensure this returns a valid integer
+    t_rpm = calc_target_rpm(); // Ensure this returns a valid integer
 
     // Apply the quadratic equation to calculate the duty cycle
     float duty_cycle = (2e-7f * t_rpm * t_rpm) + (1e-4f * t_rpm) + 0.07f;
@@ -278,20 +277,23 @@ void handle_open_loop_ctrl() {
     update_fan_speed(open_duty_cycle);
 
     // Calculate and update the global RPM variable
-    int global_rpm = calculate_rpm();
+    global_rpm = calculate_rpm();
 
     // Convert duty cycle to an integer percentage for comparison
     int duty_cycle_percent = static_cast<int>(open_duty_cycle * 100 + 0.5f); // Round to nearest integer
 
     // Only print if any of the values have changed
-    if (t_rpm != prev_t_rpm || duty_cycle_percent != prev_duty_cycle_percent || global_rpm != prev_global_rpm) {
+    if (t_rpm != prev_t_rpm || duty_cycle_percent != prev_duty_cycle_percent || global_rpm != prev_o_rpm) {
         printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d\n",
                t_rpm, open_duty_cycle, global_rpm);
 
+        //char buffer[16];
+        //sprintf(buffer, "RPM: %d", global_rpm);
+        //safe_lcd_write(buffer, 1);
         // Update previous values
         prev_t_rpm = t_rpm;
         prev_duty_cycle_percent = duty_cycle_percent;
-        prev_global_rpm = global_rpm;
+        prev_o_rpm = global_rpm;
     }
 
     ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
