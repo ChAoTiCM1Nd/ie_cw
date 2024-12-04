@@ -12,10 +12,6 @@ volatile float current_duty_cycle = 0.0f;    // Initial duty cycle
 
 volatile bool encoder_flag = false;
 
-// PID control parameters
-float Kp = 0.000041;
-float Ki = 0.0000;
-float Kd = 0.0000;
 
 float filtered_rpm = 0.0f;
 float prev_error = 0.0;
@@ -31,10 +27,11 @@ const int starting_rpm = 800;
 volatile float open_duty_cycle = 0.3;
 volatile int global_rpm = 0; // Global variable for the RPM of the fan
 
+volatile int global_encoder_pos = 0;
 
 // PID parameters
-float Kc = 1.0;            // Proportional gain
-float tauI = 0.1f;          // Integral time constant (Ki), keep at zero for now
+float Kc = 0.8;            // Proportional gain
+float tauI = 0.4f;          // Integral time constant (Ki), keep at zero for now
 float tauD = 0.0f;          // Derivative time constant (Kd), keep at zero for now
 float tSample = 0.1f;       // Sample interval in seconds (e.g., 0.1s for 100ms)
 
@@ -60,6 +57,8 @@ enum FanMode {
     AUTO
 };
 
+DigitalOut led_bi_A(PB_7);
+DigitalOut led_bi_B(PA_15);
 DigitalOut led_2(PC_0);             //LED on external header.
 DigitalOut led(LED1);
 PwmOut fan(PB_0);                   // PWM control for the fan
@@ -82,13 +81,20 @@ void encoder_interrupt_handler() {
 void count_pulse() {
     static uint32_t last_fall_time = 0;  // Time of the last falling edge
     uint32_t current_time = osKernelGetTickCount();  // Current kernel tick count (in ms)
+    static uint32_t elapsed_time = 0;
 
     // Calculate the time difference between the current and last falling edges
-    uint32_t elapsed_time = current_time - last_fall_time;
+    elapsed_time = current_time - last_fall_time;
 
     // Restart the timer (update the last falling edge time)
     last_fall_time = current_time;
 
+    if (rpm_ready) {
+        led_2 = 1;
+    }else
+    {
+        led_2 = 0; 
+    }
     // Only process the pulse if the elapsed time is greater than 15 ms (debouncing)
     if (elapsed_time > 15) {
 
@@ -98,7 +104,7 @@ void count_pulse() {
 
         pulse_count++;  // Increment pulse count
 
-        if (pulse_count == 4) {         // If 4 pulses have been counted
+        if (pulse_count == 5) {         // If 4 pulses have been counted
             end_time = current_time;    // Record the end time
             rpm_ready = true;           // Set flag indicating RPM can be calculated
             pulse_count = 0;            // Reset pulse count for the next measurement
@@ -107,39 +113,89 @@ void count_pulse() {
 }
 
 int calculate_rpm() {
- 
     static int last_rpm = 0;
+    static uint32_t last_calculation_time = 0; // Time of the last RPM calculation
+    static int last_encoder_value = 0;        // Last encoder position value
+    uint32_t current_time = osKernelGetTickCount(); // Current time in ms
+
+    // Local copies of shared variables to prevent data inconsistency
     uint32_t local_start_time = 0, local_end_time = 0;
-    bool local_rpm_ready = false;
+    static bool local_rpm_ready = false;
+    static bool local_encoder_active = false; // Flag to check if the encoder is active
+    static int encoder_value = 0; // Read encoder position
+    static int encoder_diff = 0; // Calculate encoder change
+
+    static int rpm = 0;
 
     // Safely copy shared variables with interrupts disabled
     {
         CriticalSectionLock lock; // Disable interrupts during copy
         local_rpm_ready = rpm_ready;
 
+        // Check if the encoder has moved (i.e., if the encoder position has changed)
+        encoder_value = encoder.Get();
+        encoder_diff = encoder_value - last_encoder_value;
+        
+        // If encoder value has changed recently, it means the encoder is active
+        local_encoder_active = (encoder_diff != 0);
         if (rpm_ready) {
             local_start_time = start_time;
             local_end_time = end_time;
             rpm_ready = false;  // Reset the flag
         }
 
+        // Update the last encoder value for the next check
+        last_encoder_value = encoder_value;
     }
 
-    if (local_rpm_ready) {
+    //If the encoder was active recently, skip RPM calculation
+    if (local_encoder_active) {
+
+        //Turning bi-directional LED Red
+        led_bi_A = 0;
+        led_bi_B = 1;
+        return last_rpm; // Return the last valid RPM without recalculating
+    }
+    else if (local_rpm_ready) { // Proceed with RPM calculation only if RPM data is ready
 
         uint32_t time_diff_ms = local_end_time - local_start_time;  // Time for 4 pulses in ms
+
+        //Turning bi-directional LED Green
+        led_bi_A = 1;
+        led_bi_B = 0;
+
         if (time_diff_ms > 0) {
-            // Assuming 2 pulses per revolution
-            // RPM = (2 revolutions * 60000 ms per minute) / time_diff_ms
-            int rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f) * 0.75;  // Calculate RPM and round
-            last_rpm = rpm;
-            return rpm;
+            rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f);    // Assuming 2 pulses per revolution
+            last_calculation_time = current_time; // Update calculation time
+
+            if(rpm > 0)
+            {   
+                led = 0;
+                last_rpm = rpm; // Update the last valid RPM
+                return rpm;
+            }else
+            {
+                led = 1;
+                return last_rpm;    }
+        }
+    }
+    else
+    {   led = 0;
+
+        led_bi_A = 1;
+        led_bi_B = 0;
+        //A means to differentiate between false zero readings and when fan is actuallly stopped.
+        uint32_t time_since_last_calculation = current_time - last_calculation_time;
+
+        if (time_since_last_calculation > 1000) { // Increased timeout to 3 seconds for inactivity
+            //Turning bi-directional LED off.
+            led_bi_A = 1;
+            led_bi_B = 1;
+            last_rpm = 0; // Don't reset RPM to zero immediately
         }
     }
 
-    return last_rpm;  // Return the last valid RPM if no new data
-
-
+    return last_rpm;
 }
 
 
@@ -153,13 +209,13 @@ void safe_lcd_write(const char* text, int line) {
     static char last_text[2][17] = { "", "" }; // Adjust size for two lines, 16 chars + null terminator
 
     lcd_mutex.lock();
-    if (strncmp(last_text[line], text, 16) != 0) { // Compare with last written text
-        strncpy(last_text[line], text, 16);      // Update the stored text
-        last_text[line][16] = '\0';              // Ensure null termination
+    if (strncmp(last_text[line], text, 16) != 0) {      // Compare with last written text
+        strncpy(last_text[line], text, 16);             // Update the stored text
+        last_text[line][16] = '\0';                     // Ensure null termination
 
-        char padded_text[17];          // Create a blank-padded string
-        memset(padded_text, ' ', 16); // Fill with spaces
-        padded_text[16] = '\0';                  // Ensure null termination
+        char padded_text[17];                           // Create a blank-padded string
+        memset(padded_text, ' ', 16);                   // Fill with spaces
+        padded_text[16] = '\0';                         // Ensure null termination
 
         // Copy the new text into the padded_text buffer
         strncpy(padded_text, text, strlen(text));
@@ -171,15 +227,15 @@ void safe_lcd_write(const char* text, int line) {
 
 // Update rotary encoder target RPM
 int calc_target_rpm() {
-    int encoder_value = encoder.Get();          // Read encoder position
-    int encoder_diff = encoder_value - last_encoder_value; // Calculate change
-    //static int local_target_rpm = 0;
 
-    static int local_target_rpm = 119;
+    static int local_target_rpm = 800;
 
     // Calculate step size based on the target RPM
     // The step size decreases as RPM decreases, allowing finer control at lower speeds
     static float rpm_scaling_factor = 0;
+
+    int encoder_value = encoder.Get();          // Read encoder position
+    int encoder_diff = encoder_value - last_encoder_value; // Calculate change
 
     
     if (local_target_rpm < 50) {
@@ -214,11 +270,13 @@ void handle_closed_loop_ctrl() {
     static Timer control_timer;
     static int c_target_rpm = 800;
     static bool timer_started = false;
+    static int rpm = 0;
+    float duty_cycle = 0;
 
     // Update target RPM from encoder
     c_target_rpm = calc_target_rpm();
     // Read current RPM (ensure calculate_rpm() returns a float)
-    int rpm = calculate_rpm();
+    rpm = calculate_rpm();
     
     if (!timer_started) {
         control_timer.start();
@@ -234,7 +292,7 @@ void handle_closed_loop_ctrl() {
         pid.setSetPoint(static_cast<float>(c_target_rpm));
 
         // Compute control output (duty cycle) 
-        float duty_cycle = pid.compute();
+        duty_cycle = pid.compute();
 
         printf("Setpoint: %d RPM, RPM: %d, Duty Cycle: %.3f\n", c_target_rpm, rpm, duty_cycle);
 
@@ -248,32 +306,47 @@ void handle_closed_loop_ctrl() {
 }
 
 void handle_open_loop_ctrl() {
-    fan_tacho.fall(&count_pulse); // Set tachometer interrupt
+    // Remove the tachometer interrupt setup from here
+    // It's now set up once in main()
 
-    static int t_rpm = 0;
-    static int last_pulse_count = 0;
+    // Static variables to hold previous values for comparison
+    static int prev_t_rpm = -1;
+    static int prev_o_rpm = -1;
+    static int prev_duty_cycle_percent = -1; // Duty cycle stored as an integer percentage
+    static int t_rpm = 800;
+    static int global_rpm = 0;
 
-    t_rpm = calc_target_rpm(); // Update target RPM
+    // Update target RPM from the encoder
+    t_rpm = calc_target_rpm(); // Ensure this returns a valid integer
 
-    // Apply the new quadratic equation: y = 2E-07x^2 + 2E-05x + 0.1063
-    float duty_cycle = (2e-7f * t_rpm * t_rpm) + (1e-4f * t_rpm) + 0.07;
+    // Apply the quadratic equation to calculate the duty cycle
+    float duty_cycle = (2e-7f * t_rpm * t_rpm) + (1e-4f * t_rpm) + 0.07f;
 
-    // Clamp the duty cycle to a reasonable range (0.0 to 1.0 or within any hardware limits)
+    // Clamp the duty cycle to a reasonable range (e.g., 0.0 to 1.0)
     open_duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
     global_dc = open_duty_cycle; // Update the global duty cycle variable
 
-    update_fan_speed(open_duty_cycle); // Update fan speed with the new duty cycle
-    global_rpm = calculate_rpm(); // Calculate and update the global RPM variable
+    // Update fan speed with the new duty cycle
+    update_fan_speed(open_duty_cycle);
 
-    // Calculate pulses per second
-    int pulse_diff = pulse_count - last_pulse_count;
-    pulse_per_second = pulse_diff; // Update pulses per second
+    // Calculate and update the global RPM variable
+    global_rpm = calculate_rpm();
 
-    last_pulse_count = pulse_count; // Store the current pulse count for the next cycle
+    // Convert duty cycle to an integer percentage for comparison
+    int duty_cycle_percent = static_cast<int>(open_duty_cycle * 100 + 0.5f); // Round to nearest integer
 
-    if (global_rpm > 0) {
-        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d, Pulses/Second: %d\n", 
-               t_rpm, open_duty_cycle, global_rpm, pulse_per_second);
+    // Only print if any of the values have changed
+    if (t_rpm != prev_t_rpm || duty_cycle_percent != prev_duty_cycle_percent || global_rpm != prev_o_rpm) {
+        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d\n",
+               t_rpm, open_duty_cycle, global_rpm);
+
+        char buffer[16];
+        sprintf(buffer, "RPM: %d", global_rpm);
+        safe_lcd_write(buffer, 1);
+        // Update previous values
+        prev_t_rpm = t_rpm;
+        prev_duty_cycle_percent = duty_cycle_percent;
+        prev_o_rpm = global_rpm;
     }
 
     ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
