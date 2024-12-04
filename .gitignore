@@ -10,3 +10,12 @@ mbed-os
 LCD_ST7066U/.hg/*
 ie_cw
 mRotaryEncoder/.hg/*
+mRotaryEncoder-os
+LCD_ST7066U
+mRotaryEncoder-os/PinDetect
+ie_cw/mRotaryEncoder-os
+ie_cw/mbed-os
+ie_cw/mRotaryEncoder-os/PinDetect
+ie_cw/ie_cw
+ie_cw/ie_cw/PID
+ie_cw/ie_cw/mbed-os

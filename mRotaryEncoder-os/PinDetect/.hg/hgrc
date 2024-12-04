@@ -1,6 +1,6 @@
 # example repository config (see 'hg help config' for more info)
 [paths]
-mbed-studio-cache = c:\Users\Saad\AppData\Local\Mbed Studio\library-cache\os.mbed.com\users\reedas\code\PinDetect
+mbed-studio-cache = c:\Users\th970\AppData\Local\Mbed Studio\library-cache\os.mbed.com\users\reedas\code\PinDetect
 default = https://os.mbed.com/users/reedas/code/PinDetect/
 
 # path aliases to other clones of this repo in URLs or filesystem paths
