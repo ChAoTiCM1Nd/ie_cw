@@ -38,6 +38,16 @@ float tauI = 0.8f;          // Integral time constant (Ki), keep at zero for now
 float tauD = 0.0f;          // Derivative time constant (Kd), keep at zero for now
 float tSample = 0.1f;       // Sample interval in seconds (e.g., 0.1s for 100ms)
 
+// PID parameters for temperature control
+float temp_Kc = 20.0;          // Proportional gain for temperature control
+float temp_tauI = 0.5f;       // Integral time constant (Ki) for temperature control
+float temp_tauD = 0.0f;       // Derivative time constant (Kd) for temperature control
+float temp_tSample = 1.0f;    // Sample interval in seconds (e.g., 0.1s for 100ms)
+
+// Create a PID object for temperature control
+PID temp_pid(temp_Kc, temp_tauI, temp_tauD, temp_tSample);
+float target_temp = 40.0;     // Target temperature in degrees Celsius
+
 // Create PID object
 PID pid(Kc, tauI, tauD, tSample);
 
@@ -364,8 +374,44 @@ void handle_open_loop_ctrl() {
 
 
 void handle_auto_ctrl() {
-    //handle_closed_loop_ctrl();
-    fan.write(0.0f);
+    static Timer temp_control_timer;
+    static bool timer_started = false;
+    static float duty_cycle = 0.0f;
+
+    // Start the timer for periodic PID updates
+    if (!timer_started) {
+        temp_control_timer.start();
+        timer_started = true;
+    }
+
+    // Periodically update the PID controller
+    if (temp_control_timer.elapsed_time().count() >= temp_tSample * 1e6) {  // tSample in seconds, convert to microseconds
+        temp_control_timer.reset();
+
+        float scaled_temp = (static_cast<float>(temp_data) / 255.0f) * 100.0f; // Scale to 0.0-100.0 range
+
+        // Update the temperature PID controller
+        temp_pid.setProcessValue(scaled_temp); // Current temperature from the sensor
+        temp_pid.setSetPoint(target_temp);                      // Desired target temperature
+
+        // Compute the control output (duty cycle)
+        duty_cycle = temp_pid.compute();
+
+        // Clamp the duty cycle to the valid range
+        duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
+
+        // Update fan speed
+        update_fan_speed(duty_cycle);
+
+        // Print status for debugging
+        printf("Temp: %.1f C, Target Temp: %.1f C, Duty Cycle: %.2f\n",
+               scaled_temp, target_temp, duty_cycle);
+
+        // Update the LCD
+        char buffer[16];
+        sprintf(buffer, "Temp: %.2f C", static_cast<float>(temp_data));
+        safe_lcd_write(buffer, 0);
+    }
 }
 
 void handle_off_ctrl() {
@@ -411,6 +457,10 @@ int main() {
     pid.setInputLimits(0.0f, MAX_RPM);  // MAX_RPM is 1850 in your code
     pid.setOutputLimits(0.0f, 1.0f);    // Duty cycle ranges from 0.0 to 1.0
     pid.setMode(1);  // 1 for automatic mode
+
+    temp_pid.setInputLimits(18.0f, 25.0f);
+    temp_pid.setOutputLimits(0.2f, 1.0f);
+    temp_pid.setMode(1);
 
     safe_lcd_write("M: OFF", 0); // Display initial mode
     rpm_timer.start();  // Start RPM timer
