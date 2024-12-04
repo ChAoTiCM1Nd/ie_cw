@@ -12,11 +12,6 @@ volatile float current_duty_cycle = 0.0f;    // Initial duty cycle
 
 volatile bool encoder_flag = false;
 
-// PID control parameters
-float Kp = 0.000041;
-float Ki = 0.0000;
-float Kd = 0.0000;
-
 float filtered_rpm = 0.0f;
 float prev_error = 0.0;
 float integral = 0.0;
