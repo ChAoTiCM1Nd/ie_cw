@@ -19,7 +19,7 @@ float integral = 0.0;
 
 const float integral_max = 500.0;
 const float integral_min = -500.0;
-const int MAX_RPM = 1850; // Maximum RPM corresponding to 100% duty cycle
+const int MAX_RPM = 1870; // Maximum RPM corresponding to 100% duty cycle
 const float MIN_DUTY_CYCLE = 0.01f;
 
 const int starting_rpm = 800;
@@ -29,14 +29,23 @@ volatile int global_rpm = 0; // Global variable for the RPM of the fan
 
 volatile int global_encoder_pos = 0;
 
+
+static char temp_data;
+
 // PID parameters
 float Kc = 0.8;            // Proportional gain
-float tauI = 0.4f;          // Integral time constant (Ki), keep at zero for now
+float tauI = 0.8f;          // Integral time constant (Ki), keep at zero for now
 float tauD = 0.0f;          // Derivative time constant (Kd), keep at zero for now
 float tSample = 0.1f;       // Sample interval in seconds (e.g., 0.1s for 100ms)
 
 // Create PID object
 PID pid(Kc, tauI, tauD, tSample);
+
+I2C i2c(PB_9, PB_8);
+
+const int addr1 = 0x9A; //Normal operating address of sensor
+const int addr2 = 0x9A << 1; //Write address of sensor
+char TEMP_REG = 0x00; // Register to access temperature dat
 
 Mutex lcd_mutex;
 // Custom clamp function
@@ -104,7 +113,7 @@ void count_pulse() {
 
         pulse_count++;  // Increment pulse count
 
-        if (pulse_count == 5) {         // If 4 pulses have been counted
+        if (pulse_count == 3) {         // If 4 pulses have been counted
             end_time = current_time;    // Record the end time
             rpm_ready = true;           // Set flag indicating RPM can be calculated
             pulse_count = 0;            // Reset pulse count for the next measurement
@@ -165,7 +174,7 @@ int calculate_rpm() {
         led_bi_B = 0;
 
         if (time_diff_ms > 0) {
-            rpm = static_cast<int>((2.0f * 60000.0f) / time_diff_ms + 0.5f);    // Assuming 2 pulses per revolution
+            rpm = static_cast<int>((1.0f * 60000.0f) / time_diff_ms + 0.5f);    // Assuming 2 pulses per revolution
             last_calculation_time = current_time; // Update calculation time
 
             if(rpm > 0)
@@ -187,7 +196,7 @@ int calculate_rpm() {
         //A means to differentiate between false zero readings and when fan is actuallly stopped.
         uint32_t time_since_last_calculation = current_time - last_calculation_time;
 
-        if (time_since_last_calculation > 1000) { // Increased timeout to 3 seconds for inactivity
+        if ((time_since_last_calculation > 1000)) { // Increased timeout to 3 seconds for inactivity
             //Turning bi-directional LED off.
             led_bi_A = 1;
             led_bi_B = 1;
@@ -294,7 +303,7 @@ void handle_closed_loop_ctrl() {
         // Compute control output (duty cycle) 
         duty_cycle = pid.compute();
 
-        printf("Setpoint: %d RPM, RPM: %d, Duty Cycle: %.3f\n", c_target_rpm, rpm, duty_cycle);
+        printf("Setpoint: %d RPM, RPM: %d, Duty Cycle: %.3f, Temp: %d\n", c_target_rpm, rpm, duty_cycle, temp_data);
 
         // Clamp duty cycle
         duty_cycle = clamp(duty_cycle, 0.0f, 1.0f);
@@ -320,7 +329,7 @@ void handle_open_loop_ctrl() {
     t_rpm = calc_target_rpm(); // Ensure this returns a valid integer
 
     // Apply the quadratic equation to calculate the duty cycle
-    float duty_cycle = (2e-7f * t_rpm * t_rpm) + (1e-4f * t_rpm) + 0.07f;
+    float duty_cycle = (2e-7f * t_rpm * t_rpm) + (8e-5f * t_rpm) + 0.08f;
 
     // Clamp the duty cycle to a reasonable range (e.g., 0.0 to 1.0)
     open_duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
@@ -337,8 +346,8 @@ void handle_open_loop_ctrl() {
 
     // Only print if any of the values have changed
     if (t_rpm != prev_t_rpm || duty_cycle_percent != prev_duty_cycle_percent || global_rpm != prev_o_rpm) {
-        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d\n",
-               t_rpm, open_duty_cycle, global_rpm);
+        printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d, temp: %d\n",
+               t_rpm, open_duty_cycle, global_rpm, temp_data);
 
         char buffer[16];
         sprintf(buffer, "RPM: %d", global_rpm);
@@ -416,8 +425,12 @@ int main() {
             calc_target_rpm();    // Update target RPM
         }
 
+        i2c.write(addr2, &TEMP_REG, 1); //Request data from sensor
+        i2c.read(addr1, &temp_data, 1); //Read data from sensor
+        
         update_mode();  // Update mode based on button presses
 
+        //printf("Temp = %d degC\n", temp_data); // Write Temperature data to console
         switch (current_mode) {
             case OFF:
                 handle_off_ctrl();
