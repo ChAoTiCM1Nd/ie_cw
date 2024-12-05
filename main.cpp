@@ -67,7 +67,7 @@ enum FanMode {
     ENCDR_C_LOOP,
     ENCDR_O_LOOP,
     AUTO,
-    Calibration
+    CALIB
 };
 
 DigitalOut led_bi_A(PB_7);
@@ -552,9 +552,44 @@ void handle_auto_ctrl() {
     }
 }
 
-void handle_CALI_ctrl () {
+void handle_CALI_ctrl() {
+    const int loading_bar_length = 16; // Length of the loading bar
+    float duty_cycle = 1.0f;           // Start at 100% duty cycle
+    int rpm = 0;
+    int step = 0;                      // Tracks progress for the loading bar
+    char loading_bar[17] = "";         // 16 characters + null terminator
 
+    safe_lcd_write("Calibrating...  ", 0); // Display status on the first line
 
+    while (duty_cycle > MIN_DUTY_CYCLE) {
+        update_fan_speed(duty_cycle);  // Update fan speed
+        ThisThread::sleep_for(500ms); // Wait for the fan to stabilize
+        rpm = calculate_rpm();        // Measure RPM
+
+        // Update loading bar
+        step++;
+        int filled_length = (step * loading_bar_length) / static_cast<int>(1.0f / MIN_DUTY_CYCLE);
+        for (int i = 0; i < loading_bar_length; i++) {
+            loading_bar[i] = (i < filled_length) ? '#' : ' ';
+        }
+        loading_bar[loading_bar_length] = '\0'; // Null-terminate the string
+
+        safe_lcd_write(loading_bar, 1); // Update the second line with the loading bar
+
+        // Print RPM for debugging
+        printf("Duty Cycle: %.2f, RPM: %d\n", duty_cycle, rpm);
+
+        duty_cycle -= 0.05f; // Step down the duty cycle
+    }
+
+    // Display the results on the LCD
+    char buffer[17];
+    sprintf(buffer, "Max RPM: %d", calculate_rpm()); // Display max RPM
+    safe_lcd_write(buffer, 0);
+    sprintf(buffer, "Min RPM: %d", rpm);            // Display min RPM
+    safe_lcd_write(buffer, 1);
+
+    update_fan_speed(0.0f); // Turn off the fan
 }
 
 
@@ -598,7 +633,7 @@ void update_mode() {
                 safe_lcd_write("                ", 1);
                 wait_us(1000000);
                 break;
-            case Calibration:
+            case CALIB:
                 safe_lcd_write("M: Calibration", 0);
                 safe_lcd_write("                ", 1);
                 wait_us(1000000);
@@ -650,7 +685,7 @@ int main() {
             case AUTO:
                 handle_auto_ctrl();
                 break;
-            case Calibration:
+            case CALIB:
                 handle_CALI_ctrl();
                 break;
         }
