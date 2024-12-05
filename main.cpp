@@ -66,7 +66,8 @@ enum FanMode {
     OFF,
     ENCDR_C_LOOP,
     ENCDR_O_LOOP,
-    AUTO
+    AUTO,
+    Calibration
 };
 
 DigitalOut led_bi_A(PB_7);
@@ -551,6 +552,11 @@ void handle_auto_ctrl() {
     }
 }
 
+void handle_CALI_ctrl () {
+
+
+}
+
 
 
 
@@ -568,7 +574,7 @@ void update_mode() {
 
     if (button_state == 0 && last_button_state == 1 && debounce_timer.elapsed_time().count() > 100000) {
         debounce_timer.reset();
-        current_mode = static_cast<FanMode>((current_mode + 1) % 4);
+        current_mode = static_cast<FanMode>((current_mode + 1) % 5);
 
         // Update LCD mode display
         switch (current_mode) {
@@ -589,6 +595,11 @@ void update_mode() {
                 break;
             case AUTO:
                 safe_lcd_write("M: AUTO", 0);
+                safe_lcd_write("                ", 1);
+                wait_us(1000000);
+                break;
+            case Calibration:
+                safe_lcd_write("M: Calibration", 0);
                 safe_lcd_write("                ", 1);
                 wait_us(1000000);
                 break;
@@ -638,6 +649,9 @@ int main() {
                 break;
             case AUTO:
                 handle_auto_ctrl();
+                break;
+            case Calibration:
+                handle_CALI_ctrl();
                 break;
         }
 
