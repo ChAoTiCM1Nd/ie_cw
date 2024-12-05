@@ -22,7 +22,7 @@ float temp_tSample = 0.1f;    // Sample interval in seconds (e.g., 0.1s for 100m
 
 const float integral_max = 500.0;
 const float integral_min = -500.0;
-const int MAX_RPM = 1830; // Maximum RPM corresponding to 100% duty cycle
+const int MAX_RPM = 1850; // Maximum RPM corresponding to 100% duty cycle
 const float MIN_DUTY_CYCLE = 0.01f;
 
 const int starting_rpm = 800;
@@ -36,9 +36,9 @@ volatile int global_encoder_pos = 0;
 static char temp_data;
 
 // PID parameters
-float Kc = 1.2;            // Proportional gain
-float tauI = 1.9f;          // Integral time constant (Ki), keep at zero for now
-float tauD = 0.0f;          // Derivative time constant (Kd), keep at zero for now
+float Kc = 0.8;            // Proportional gain
+float tauI = 0.8f;          // Integral time constant (Ki), keep at zero for now
+float tauD = 0.001f;          // Derivative time constant (Kd), keep at zero for now
 float tSample = 0.1f;       // Sample interval in seconds (e.g., 0.1s for 100ms)
 
 // Create PID object
@@ -304,6 +304,31 @@ void handle_closed_loop_ctrl() {
 
         safe_lcd_write(buffer_line2, 1); // Write to the second line of the LCD
 
+         // LED Control based on RPM
+    if ((rpm <= 200 && rpm != 0) && (duty_cycle > 0)) {
+        led_bi_A = 0; // red
+        led_bi_B = 1; // green
+        led_2 = 0;    // Turn off other LED
+        wait_us(50000);
+    } 
+    else if (rpm > 1750) {
+        led_bi_A = 1; // green
+        led_bi_B = 0; // red
+        led_2 = 0;    // Turn off other LED
+        wait_us(50000);
+    } 
+    else if ((rpm == 0) && (duty_cycle > 0)){
+        led_bi_A = 0; // red
+        led_bi_B = 1; // green
+        led_2 = 1;    // Turn on another LED (e.g., an indicator LED)
+        wait_us(50000);
+    }
+    else {
+        led_bi_A = 0; // red
+        led_bi_B = 0; // off
+        led_2 = 0;    // Turn off all LEDs
+    }
+
     }
 }
 
@@ -361,6 +386,30 @@ void handle_open_loop_ctrl() {
         prev_t_rpm = t_rpm;
         prev_duty_cycle_percent = duty_cycle_percent;
         prev_o_rpm = global_rpm;
+
+    if ((global_rpm <= 200 && global_rpm != 0) && (duty_cycle > 0)) {
+        led_bi_A = 0; // red
+        led_bi_B = 1; // green
+        led_2 = 0;    // Turn off other LED
+        wait_us(50000);
+    } 
+    else if (global_rpm > 1750) {
+        led_bi_A = 1; // green
+        led_bi_B = 0; // red
+        led_2 = 0;    // Turn off other LED
+        wait_us(50000);
+    } 
+    else if ((global_rpm == 0) && (duty_cycle > 0)){
+        led_bi_A = 0; // red
+        led_bi_B = 1; // green
+        led_2 = 1;    // Turn on another LED (e.g., an indicator LED)
+        wait_us(50000);
+    }
+    else {
+        led_bi_A = 0; // red
+        led_bi_B = 0; // off
+        led_2 = 0;    // Turn off all LEDs
+    }
 
     }
 
@@ -474,6 +523,30 @@ void handle_auto_ctrl() {
         sprintf(buffer_line2, "AT=%02d. RPM= %04d", static_cast<int>(current_temp), rpm);  // Show current temperature and RPM
 
         safe_lcd_write(buffer_line2, 1); // Write to the second line of the LCD
+
+    if ((rpm <= 200 && rpm != 0) && (duty_cycle > 0)) {
+        led_bi_A = 0; // red
+        led_bi_B = 1; // green
+        led_2 = 0;    // Turn off other LED
+        wait_us(50000);
+    } 
+    else if (rpm > 1750) {
+        led_bi_A = 1; // green
+        led_bi_B = 0; // red
+        led_2 = 0;    // Turn off other LED
+        wait_us(50000);
+    } 
+    else if ((rpm == 0) && (duty_cycle > 0)){
+        led_bi_A = 0; // red
+        led_bi_B = 1; // green
+        led_2 = 1;    // Turn on another LED (e.g., an indicator LED)
+        wait_us(50000);
+    }
+    else {
+        led_bi_A = 0; // red
+        led_bi_B = 0; // off
+        led_2 = 0;    // Turn off all LEDs
+    }
 
     }
 }
