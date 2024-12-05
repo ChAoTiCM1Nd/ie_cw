@@ -18,9 +18,11 @@ float filtered_rpm = 0.0f;
 float prev_error = 0.0;
 float integral = 0.0;
 
+float temp_tSample = 0.1f;    // Sample interval in seconds (e.g., 0.1s for 100ms)
+
 const float integral_max = 500.0;
 const float integral_min = -500.0;
-const int MAX_RPM = 1860; // Maximum RPM corresponding to 100% duty cycle
+const int MAX_RPM = 1830; // Maximum RPM corresponding to 100% duty cycle
 const float MIN_DUTY_CYCLE = 0.01f;
 
 const int starting_rpm = 800;
@@ -34,19 +36,10 @@ volatile int global_encoder_pos = 0;
 static char temp_data;
 
 // PID parameters
-float Kc = 0.8;            // Proportional gain
-float tauI = 0.8f;          // Integral time constant (Ki), keep at zero for now
+float Kc = 1.2;            // Proportional gain
+float tauI = 1.9f;          // Integral time constant (Ki), keep at zero for now
 float tauD = 0.0f;          // Derivative time constant (Kd), keep at zero for now
 float tSample = 0.1f;       // Sample interval in seconds (e.g., 0.1s for 100ms)
-
-// PID parameters for temperature control
-float temp_Kc = 1.0;          // Proportional gain for temperature control
-float temp_tauI = 0.0f;       // Integral time constant (Ki) for temperature control
-float temp_tauD = 0.0f;       // Derivative time constant (Kd) for temperature control
-float temp_tSample = 0.1f;    // Sample interval in seconds (e.g., 0.1s for 100ms)
-
-// Create a PID object for temperature control
-PID temp_pid(temp_Kc, temp_tauI, temp_tauD, temp_tSample);
 
 // Create PID object
 PID pid(Kc, tauI, tauD, tSample);
@@ -108,12 +101,7 @@ void count_pulse() {
     // Restart the timer (update the last falling edge time)
     last_fall_time = current_time;
 
-    if (rpm_ready) {
-        led_2 = 1;
-    }else
-    {
-        led_2 = 0; 
-    }
+    
     // Only process the pulse if the elapsed time is greater than 15 ms (debouncing)
     if (elapsed_time > 15) {
 
@@ -167,55 +155,40 @@ int calculate_rpm() {
         last_encoder_value = encoder_value;
     }
 
-    //If the encoder was active recently, skip RPM calculation
+    // If the encoder was active recently, skip RPM calculation
     if (local_encoder_active) {
-
-        //Turning bi-directional LED Red
-        led_bi_A = 0;
-        led_bi_B = 1;
         return last_rpm; // Return the last valid RPM without recalculating
     }
     else if (local_rpm_ready) { // Proceed with RPM calculation only if RPM data is ready
-
         uint32_t time_diff_ms = local_end_time - local_start_time;  // Time for 4 pulses in ms
-
-        //Turning bi-directional LED Green
-        led_bi_A = 1;
-        led_bi_B = 0;
 
         if (time_diff_ms > 0) {
             rpm = static_cast<int>((1.0f * 60000.0f) / time_diff_ms + 0.5f);    // Assuming 2 pulses per revolution
             last_calculation_time = current_time; // Update calculation time
 
-            if(rpm > 0)
-            {   
-                led = 0;
+            if (rpm > 0) {
                 last_rpm = rpm; // Update the last valid RPM
+                // Debugging output for RPM
                 return rpm;
-            }else
-            {
-                led = 1;
-                return last_rpm;    }
+            }
+            else { 
+                return last_rpm; // Return the last valid RPM if RPM is zero
+            }
         }
     }
-    else
-    {   led = 0;
-
-        led_bi_A = 1;
-        led_bi_B = 0;
-        //A means to differentiate between false zero readings and when fan is actuallly stopped.
+    else {  
+        // If no valid RPM data has been calculated recently, handle it
         uint32_t time_since_last_calculation = current_time - last_calculation_time;
-
         if ((time_since_last_calculation > 1000)) { // Increased timeout to 3 seconds for inactivity
-            //Turning bi-directional LED off.
-            led_bi_A = 1;
-            led_bi_B = 1;
-            last_rpm = 0; // Don't reset RPM to zero immediately
+           last_rpm = 0; // Don't reset RPM to zero immediately
         }
     }
 
     return last_rpm;
+
 }
+
+
 
 
 // Update fan speed based on duty cycle
@@ -257,10 +230,9 @@ int calc_target_rpm() {
     int encoder_diff = encoder_value - last_encoder_value; // Calculate change
 
     
-    if (local_target_rpm < 50) {
+    if (local_target_rpm < 200) {
         rpm_scaling_factor = 0.1f; // Fine adjustments for low RPM
-
-    } else if (local_target_rpm < 200) {
+    } else if (local_target_rpm < 300) {
         rpm_scaling_factor = 0.2f; // Fine adjustments for low RPM
     } else if (local_target_rpm < 500) {
         rpm_scaling_factor = 0.5f; // Fine adjustments for low RPM
@@ -273,10 +245,6 @@ int calc_target_rpm() {
         local_target_rpm += static_cast<int>(encoder_diff * 10 * rpm_scaling_factor); // Adjust RPM based on scaled encoder change
         local_target_rpm = clamp(local_target_rpm, 0, MAX_RPM);
 
-        // Update LCD and log
-        char buffer[16];
-        sprintf(buffer, "Target RPM: %d", local_target_rpm);
-        safe_lcd_write(buffer, 1);
     }
 
     last_encoder_value = encoder_value; // Update last position
@@ -291,6 +259,8 @@ void handle_closed_loop_ctrl() {
     static bool timer_started = false;
     static int rpm = 0;
     float duty_cycle = 0;
+
+    float current_temp = static_cast<float>(temp_data);
 
     // Update target RPM from encoder
     c_target_rpm = calc_target_rpm();
@@ -320,7 +290,20 @@ void handle_closed_loop_ctrl() {
 
         // Update fan speed
         update_fan_speed(duty_cycle);
-        
+
+        char buffer_line1[16];
+        char buffer_line2[16];
+
+        // Format the first line: "M: AL. TT = XX."
+        sprintf(buffer_line1, "M: CL. T= %04d", c_target_rpm);  // Show target temperature on the first line
+
+        safe_lcd_write(buffer_line1, 0); // Write to the first line of the LCD
+
+        // Format the second line: "AT=XX. RPM= XXXX"
+        sprintf(buffer_line2, "AT=%02d. RPM= %04d", static_cast<int>(current_temp), rpm);  // Show current temperature and RPM
+
+        safe_lcd_write(buffer_line2, 1); // Write to the second line of the LCD
+
     }
 }
 
@@ -334,6 +317,8 @@ void handle_open_loop_ctrl() {
     static int prev_duty_cycle_percent = -1; // Duty cycle stored as an integer percentage
     static int t_rpm = 800;
     static int global_rpm = 0;
+
+    float current_temp = static_cast<float>(temp_data);
 
     // Update target RPM from the encoder
     t_rpm = calc_target_rpm(); // Ensure this returns a valid integer
@@ -359,13 +344,24 @@ void handle_open_loop_ctrl() {
         printf("Target RPM: %d, Duty Cycle: %.2f, Current RPM: %d, temp: %d\n",
                t_rpm, open_duty_cycle, global_rpm, temp_data);
 
-        char buffer[16];
-        sprintf(buffer, "RPM: %d", global_rpm);
-        safe_lcd_write(buffer, 1);
+        char buffer_line1[16];
+        char buffer_line2[16];
+
+        // Format the first line: "M: AL. TT = XX."
+        sprintf(buffer_line1, "M: OL. T= %04d", t_rpm);  // Show target temperature on the first line
+
+        safe_lcd_write(buffer_line1, 0); // Write to the first line of the LCD
+
+        // Format the second line: "AT=XX. RPM= XXXX"
+        sprintf(buffer_line2, "AT=%02d. RPM= %04d", static_cast<int>(current_temp), global_rpm);  // Show current temperature and RPM
+
+        safe_lcd_write(buffer_line2, 1); // Write to the second line of the LCD
+
         // Update previous values
         prev_t_rpm = t_rpm;
         prev_duty_cycle_percent = duty_cycle_percent;
         prev_o_rpm = global_rpm;
+
     }
 
     ThisThread::sleep_for(1ms); // Add a small delay to avoid overloading the system
@@ -472,11 +468,13 @@ void handle_auto_ctrl() {
         // Format the first line: "M: AL. TT = XX."
         sprintf(buffer_line1, "M: AL. TT = %02d", target_temp);  // Show target temperature on the first line
 
+        safe_lcd_write(buffer_line1, 0); // Write to the first line of the LCD
+
         // Format the second line: "AT=XX. RPM= XXXX"
         sprintf(buffer_line2, "AT=%02d. RPM= %04d", static_cast<int>(current_temp), rpm);  // Show current temperature and RPM
 
-        safe_lcd_write(buffer_line1, 0); // Write to the first line of the LCD
         safe_lcd_write(buffer_line2, 1); // Write to the second line of the LCD
+
     }
 }
 
@@ -502,22 +500,31 @@ void update_mode() {
         // Update LCD mode display
         switch (current_mode) {
             case OFF:
-                safe_lcd_write("M: OFF", 0);
+                safe_lcd_write("M: OFF          ", 0);
+                safe_lcd_write("                ", 1);
+                wait_us(1000000);
                 break;
             case ENCDR_C_LOOP:
                 safe_lcd_write("M: Closed Loop", 0);
+                safe_lcd_write("                ", 1);
+                wait_us(1000000);
                 break;
             case ENCDR_O_LOOP:
                 safe_lcd_write("M: Open Loop", 0);
+                safe_lcd_write("                ", 1);
+                wait_us(1000000);
                 break;
             case AUTO:
                 safe_lcd_write("M: AUTO", 0);
+                safe_lcd_write("                ", 1);
+                wait_us(1000000);
                 break;
         }
     }
 
     last_button_state = button_state;  // Update last button state
 }
+
 
 int main() {
     fan.period(0.005f);  // Set PWM period 200Hz frequency
@@ -526,10 +533,6 @@ int main() {
     pid.setInputLimits(0.0f, MAX_RPM);  // MAX_RPM is 1850 in your code
     pid.setOutputLimits(0.0f, 1.0f);    // Duty cycle ranges from 0.0 to 1.0
     pid.setMode(1);  // 1 for automatic mode
-
-    temp_pid.setInputLimits(0.0f, 100.0f);
-    temp_pid.setOutputLimits(0.0f, 1.0f);
-    temp_pid.setMode(1);
 
     safe_lcd_write("M: OFF", 0); // Display initial mode
     rpm_timer.start();  // Start RPM timer
