@@ -14,10 +14,6 @@ volatile float current_duty_cycle = 0.0f;    // Initial duty cycle
 volatile bool encoder_flag = false;
 
 
-float filtered_rpm = 0.0f;
-float prev_error = 0.0;
-float integral = 0.0;
-
 float temp_tSample = 0.1f;    // Sample interval in seconds (e.g., 0.1s for 100ms)
 
 const float integral_max = 500.0;
