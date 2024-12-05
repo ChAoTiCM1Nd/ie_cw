@@ -2,6 +2,7 @@
 #include "LCD_ST7066U.h"
 #include "mRotaryEncoder.h"
 #include <cmath> // For mathematical operations
+#include <cstdio>
 #include "pid.h"
 
 // Global variables and constants
@@ -19,7 +20,7 @@ float integral = 0.0;
 
 const float integral_max = 500.0;
 const float integral_min = -500.0;
-const int MAX_RPM = 1870; // Maximum RPM corresponding to 100% duty cycle
+const int MAX_RPM = 1860; // Maximum RPM corresponding to 100% duty cycle
 const float MIN_DUTY_CYCLE = 0.01f;
 
 const int starting_rpm = 800;
@@ -39,14 +40,13 @@ float tauD = 0.0f;          // Derivative time constant (Kd), keep at zero for n
 float tSample = 0.1f;       // Sample interval in seconds (e.g., 0.1s for 100ms)
 
 // PID parameters for temperature control
-float temp_Kc = 20.0;          // Proportional gain for temperature control
-float temp_tauI = 0.5f;       // Integral time constant (Ki) for temperature control
+float temp_Kc = 1.0;          // Proportional gain for temperature control
+float temp_tauI = 0.0f;       // Integral time constant (Ki) for temperature control
 float temp_tauD = 0.0f;       // Derivative time constant (Kd) for temperature control
-float temp_tSample = 1.0f;    // Sample interval in seconds (e.g., 0.1s for 100ms)
+float temp_tSample = 0.1f;    // Sample interval in seconds (e.g., 0.1s for 100ms)
 
 // Create a PID object for temperature control
 PID temp_pid(temp_Kc, temp_tauI, temp_tauD, temp_tSample);
-float target_temp = 40.0;     // Target temperature in degrees Celsius
 
 // Create PID object
 PID pid(Kc, tauI, tauD, tSample);
@@ -378,41 +378,110 @@ void handle_auto_ctrl() {
     static bool timer_started = false;
     static float duty_cycle = 0.0f;
 
-    // Start the timer for periodic PID updates
+    // PID parameters (manually tuned)
+    static const float Kp = 0.1f;   // Proportional gain
+    static const float Ki = 0.0f;  // Integral gain
+    static const float Kd = 0.0f;  // Derivative gain
+
+    // PID state variables
+    static float prev_error = 0.0f;   // Error at the previous time step
+    static float integral = 0.0f;    // Cumulative integral term
+    static float derivative = 0.0f;  // Derivative term
+
+    // Fan boost parameters
+    const float BOOST_DUTY_CYCLE = 0.5f; // Boost duty cycle (20%)
+    const float ERROR_THRESHOLD = 3.0f; // Error below which boost is triggered
+    static bool boost_active = false;
+
+    // Target temperature (adjustable with encoder)
+    static int target_temp = 10;  // Start at 10 degrees
+    static int last_encoder_value = 0;
+
+    // Calculate RPM
+    int rpm = calculate_rpm();
+
+    // Read encoder input to update target temperature
+    int encoder_value = encoder.Get(); // Replace encoder.Get() with your actual encoder reading function
+    int encoder_diff = encoder_value - last_encoder_value;
+    if (encoder_diff != 0) {
+        target_temp += encoder_diff;  // Increment or decrement target temperature
+        target_temp = clamp(target_temp, 0, 100);  // Clamp between 0 and 100 degrees
+        last_encoder_value = encoder_value;       // Update last encoder value
+    }
+
+    // Start the timer for periodic updates
     if (!timer_started) {
         temp_control_timer.start();
         timer_started = true;
     }
 
     // Periodically update the PID controller
-    if (temp_control_timer.elapsed_time().count() >= temp_tSample * 1e6) {  // tSample in seconds, convert to microseconds
+    if (temp_control_timer.elapsed_time().count() >= temp_tSample * 1e6) {  // temp_tSample in seconds, convert to microseconds
         temp_control_timer.reset();
 
-        float scaled_temp = (static_cast<float>(temp_data) / 255.0f) * 100.0f; // Scale to 0.0-100.0 range
+        // Read the current temperature
+        float current_temp = static_cast<float>(temp_data);
 
-        // Update the temperature PID controller
-        temp_pid.setProcessValue(scaled_temp); // Current temperature from the sensor
-        temp_pid.setSetPoint(target_temp);                      // Desired target temperature
+        // Calculate error (difference between current and target temperature)
+        float error = current_temp - target_temp;
 
-        // Compute the control output (duty cycle)
-        duty_cycle = temp_pid.compute();
+        if (error > 0.0f) {  // Only activate fan if the temperature is higher than the target
+            // Compute proportional term
+            float proportional = Kp * error;
 
-        // Clamp the duty cycle to the valid range
-        duty_cycle = clamp(duty_cycle, MIN_DUTY_CYCLE, 1.0f);
+            // Compute integral term (accumulate error over time)
+            integral += error * temp_tSample;
+
+            // Compute derivative term (rate of error change)
+            derivative = (error - prev_error) / temp_tSample;
+
+            // Compute total PID output
+            float pid_output = proportional + (Ki * integral) + (Kd * derivative);
+
+            // Update the previous error for the next cycle
+            prev_error = error;
+
+            // Convert PID output to duty cycle and clamp it to the valid range
+            duty_cycle = clamp(pid_output, MIN_DUTY_CYCLE, 1.0f);
+
+            // Trigger a brief boost if the error is below the threshold and the fan is not spinning
+            if (error < ERROR_THRESHOLD && duty_cycle < BOOST_DUTY_CYCLE && !boost_active && rpm < 100) {
+                duty_cycle = BOOST_DUTY_CYCLE; // Apply the boost
+                boost_active = true;          // Mark boost as active
+            } else {
+                boost_active = false;         // Deactivate boost if conditions no longer apply
+            }
+        } else {
+            // Turn off the fan if temperature is below or equal to target
+            duty_cycle = 0.0f;
+            prev_error = 0.0f;  // Reset previous error
+            integral = 0.0f;    // Reset integral term
+        }
 
         // Update fan speed
         update_fan_speed(duty_cycle);
 
-        // Print status for debugging
-        printf("Temp: %.1f C, Target Temp: %.1f C, Duty Cycle: %.2f\n",
-               scaled_temp, target_temp, duty_cycle);
+        // Debugging output
+        printf("Temp: %.1f C, Target Temp: %d C, Duty Cycle: %.3f, Error: %.2f, P: %.2f, I: %.2f, D: %.2f, RPM: %d\n",
+               current_temp, target_temp, duty_cycle, error, Kp * error, Ki * integral, Kd * derivative, rpm);
 
         // Update the LCD
-        char buffer[16];
-        sprintf(buffer, "Temp: %.2f C", static_cast<float>(temp_data));
-        safe_lcd_write(buffer, 0);
+        char buffer_line1[16];
+        char buffer_line2[16];
+
+        // Format the first line: "M: AL. TT = XX."
+        sprintf(buffer_line1, "M: AL. TT = %02d", target_temp);  // Show target temperature on the first line
+
+        // Format the second line: "AT=XX. RPM= XXXX"
+        sprintf(buffer_line2, "AT=%02d. RPM= %04d", static_cast<int>(current_temp), rpm);  // Show current temperature and RPM
+
+        safe_lcd_write(buffer_line1, 0); // Write to the first line of the LCD
+        safe_lcd_write(buffer_line2, 1); // Write to the second line of the LCD
     }
 }
+
+
+
 
 void handle_off_ctrl() {
     fan.write(0.0f);
@@ -458,8 +527,8 @@ int main() {
     pid.setOutputLimits(0.0f, 1.0f);    // Duty cycle ranges from 0.0 to 1.0
     pid.setMode(1);  // 1 for automatic mode
 
-    temp_pid.setInputLimits(18.0f, 25.0f);
-    temp_pid.setOutputLimits(0.2f, 1.0f);
+    temp_pid.setInputLimits(0.0f, 100.0f);
+    temp_pid.setOutputLimits(0.0f, 1.0f);
     temp_pid.setMode(1);
 
     safe_lcd_write("M: OFF", 0); // Display initial mode
