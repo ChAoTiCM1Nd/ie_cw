@@ -173,7 +173,7 @@ The firmware continuously reads sensors, updates control parameters, and drives 
 
 | **Condition**            | **PB_7 (Bi-A)** | **PA_15 (Bi-B)** | **PC_0 (LED 2)** | **Description**                              |
 |--------------------------|----------------|-----------------|-----------------|----------------------------------------------|
-| High RPM (>1750)         | Green          | Red             | OFF             | Fan operating at high RPM.                   |
+| High RPM (>1750)         | Green          | OFF             | OFF             | Fan operating at high RPM.                   |
 | Low RPM (<200)           | Red            | Green           | OFF             | Fan operating at low RPM.                    |
 | Stalled Fan              | OFF            | Green           | ON              | Fan is stalled despite a duty cycle > 0.     |
 | Calibration in Progress  | OFF            | OFF             | ON              | Calibration mode is active.                  |
