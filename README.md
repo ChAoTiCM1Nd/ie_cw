@@ -140,14 +140,14 @@ To run this project locally, follow these steps to set up your environment and h
 1. **Clone the Repository**:
    ```bash
    git clone https://github.com/requiem002/ie_cw.git
-2. ""Open the Project in Mbed Studio""
+2. **Open the Project in Mbed Studio**
    - Launch MBED Studio
    - Import the cloned folder as an MBED project.
 
 3. **Install Libraries**:
-   - Ensure all required libraries (`LCD_ST7066U`, `mRotaryEncoder`, `PID`) are included in `mbed_app.json` or imported as libraries.
+   - Ensure all required libraries are included in `mbed_app.json` or imported as libraries.
 
-4. ""Compile & Flash""
+4. **Compile & Flash**
     - Connect the NUCLEO board via USB.
     - Build the project in Mbed Studio.
     - Drag and drop the compiled `.bin` file onto the NUCLEO drive.
@@ -182,18 +182,6 @@ Once powered, the LCD will show the current mode. Use the push button to cycle t
 
 ---
 
-## Tuning the PID Parameters
-
-- **Kc (Proportional)**: Increases responsiveness. High `Kc` might cause oscillations if too large.
-- **tauI (Integral)**: Helps reduce steady-state error. Increase carefully to avoid overshoot.
-- **tauD (Derivative)**: Helps counteract rapid changes. Too high can introduce noise sensitivity.
-
-Adjust these parameters in the code to achieve the desired performance. Start with small changes and observe fan behavior.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
----
-
 ## Troubleshooting
 
 - **Fan Not Spinning**:
@@ -202,8 +190,8 @@ Adjust these parameters in the code to achieve the desired performance. Start wi
   - Verify tachometer wiring. Make sure the pulse-per-revolution assumption matches your fan’s specifications.
 - **LCD Not Displaying**:
   - Confirm LCD pin connections and contrast settings.
-- **Oscillations in Speed**:
-  - Refine PID parameters. Reduce `Kc` or adjust `tauI` and `tauD` as needed.
+- **Inaccurate performance with new fan **:
+  - Run the calibration mode to obtain and automatically set correct parameters for a new fan.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -240,7 +228,7 @@ Don't forget to give the project a star! Thanks again!
 ### Top contributors:
 
 <a href="https://github.com/requiem002/ie_cw/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=github_username/repo_name" alt="contrib.rocks image" />
+  <img src="https://contrib.rocks/image?repo=requiem002/ie_cw" alt="contrib.rocks image" />
 </a>
 
 
@@ -258,7 +246,7 @@ Distributed under the project_license. See `LICENSE.txt` for more information.
 ## Contact
 
 Saad Ahmed sa2879@bath.ac.uk
-Tom Hunter th____@bath.ac.uk
+Tom Hunter th970@bath.ac.uk
 
 Project Link: [https://github.com/requiem002/ie_cw](https://github.com/requiem002/ie_cw)
 
