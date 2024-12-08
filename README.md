@@ -150,13 +150,6 @@ To run this project locally, follow these steps to set up your environment and h
     - Build the project in Mbed Studio.
     - Drag and drop the compiled `.bin` file onto the NUCLEO drive.
 
----
-
-## Hardware Connections
-
-Refer to the **pin assignment table** above. Connect the fan, tachometer, encoder, LCD, and temperature sensor as indicated. Double-check all wiring before powering on.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ---
 
@@ -243,8 +236,8 @@ Distributed under the project_license. See `LICENSE.txt` for more information.
 <!-- CONTACT -->
 ## Contact
 
-Saad Ahmed sa2879@bath.ac.uk
-Tom Hunter th970@bath.ac.uk
+Saad Ahmed [sa2879@bath.ac.uk]
+Tom Hunter [th970@bath.ac.uk]
 
 Project Link: [https://github.com/requiem002/ie_cw](https://github.com/requiem002/ie_cw)
 
@@ -261,6 +254,7 @@ Project Link: [https://github.com/requiem002/ie_cw](https://github.com/requiem00
   - `LCD_ST7066U` library by Luis Rodriguez [https://os.mbed.com/users/luisfrdr/code/LCD_ST7066U/]
   - `mRotaryEncoder-os` library by Karl Zweimüller [https://os.mbed.com/users/charly/code/mRotaryEncoder-os/]
   - `PID` library adapted from Brett Beauregard's Arduino PID library.
+  
 This project was developed as part of a coursework activity to build an understanding of programming an embedded processor-based system using C.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
