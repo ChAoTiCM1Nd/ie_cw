@@ -243,6 +243,8 @@ Once powered, the LCD will show the current mode. Use the push button to cycle t
   - Confirm LCD pin connections and contrast settings.
 - **Inaccurate performance with new fan **:
   - Run the calibration mode to obtain and automatically set correct parameters for a new fan.
+- **Modes not changing when button pushed**:
+  - Wait 1 second when in new mode for the mode to load or investigate push button signal.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
