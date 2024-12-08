@@ -174,8 +174,8 @@ The firmware continuously reads sensors, updates control parameters, and drives 
 | **Condition**            | **PB_7 (Bi-A)** | **PA_15 (Bi-B)** | **PC_0 (LED 2)** | **Description**                              |
 |--------------------------|----------------|-----------------|-----------------|----------------------------------------------|
 | High RPM (>1750)         | Green          | OFF             | OFF             | Fan operating at high RPM.                   |
-| Low RPM (<200)           | Red            | Green           | OFF             | Fan operating at low RPM.                    |
-| Stalled Fan              | OFF            | Green           | ON              | Fan is stalled despite a duty cycle > 0.     |
+| Low RPM (<200)           | Red            | OFF             | OFF             | Fan operating at low RPM.                    |
+| Stalled Fan              | RED            | RED             | OFF             | Fan is stalled despite a duty cycle > 0.     |
 | Calibration in Progress  | OFF            | OFF             | ON              | Calibration mode is active.                  |
 | OFF Mode                 | OFF            | OFF             | OFF             | System is off.                               |
 
@@ -248,6 +248,8 @@ Once powered, the LCD will show the current mode. Use the push button to cycle t
   - Confirm LCD pin connections and contrast settings.
 - **Inaccurate performance with new fan **:
   - Run the calibration mode to obtain and automatically set correct parameters for a new fan.
+- **Modes not changing when button pushed**:
+  - Wait 1 second when in new mode for the mode to load or investigate push button signal.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
