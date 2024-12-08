@@ -30,7 +30,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/github_username/repo_name">
+  <a ![](https://github.com/requiem002/ie_cw/blob/provisional_master/fan.gif)">
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>
 
@@ -82,7 +82,7 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
-![](https://github.com/requiem002/ie_cw/blob/provisional_master/fan.gif)
+
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
 
