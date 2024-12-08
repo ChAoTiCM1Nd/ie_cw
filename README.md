@@ -250,6 +250,7 @@ Whether you need a stable RPM under varying loads, a fan speed that responds to 
 ## System Architecture
 
 The firmware continuously reads sensors, updates control parameters, and drives the fan accordingly. It runs in a loop, calling different handlers based on the current mode.
+<img src="https://github.com/requiem002/ie_cw/master/system_arch.jpg" width=40%>
 
 ### Control Modes
 - **OFF**: Fan is turned off (0% duty cycle).
