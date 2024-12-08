@@ -164,7 +164,136 @@ Build the project in Mbed Studio.
 ---
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<!-- Improved Fan Controller README -->
 
+<a id="readme-top"></a>
+
+[![Contributors][contributors-shield]][contributors-url]
+[![Issues][issues-shield]][issues-url]
+[![License][license-shield]][license-url]
+[![Saad's LinkedIn][linkedin-shield]][saad-linkedin-url]
+[![Tom's LinkedIn][linkedin-shield]][tom-linkedin-url]
+
+<br />
+<div align="center">
+  <a href="https://github.com/requiem002/ie_cw">
+    <img src="fan.gif" alt="Fan Controller Logo" width="80" height="80">
+  </a>
+
+  <h3 align="center">Fan Controller System</h3>
+
+  <p align="center">
+    A versatile embedded fan control system for precise and automated speed regulation based on user input and environmental conditions.
+    <br />
+    <a href="https://github.com/requiem002/ie_cw"><strong>Explore the Docs »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/requiem002/ie_cw">View Demo</a>
+    ·
+    <a href="https://github.com/requiem002/ie_cw/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    ·
+    <a href="https://github.com/requiem002/ie_cw/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+  </p>
+</div>
+
+---
+
+## Table of Contents
+
+1. [About the Project](#about-the-project)
+   - [Key Features](#key-features)
+   - [Built With](#built-with)
+2. [System Architecture](#system-architecture)
+   - [Control Modes](#control-modes)
+   - [PID Control Overview](#pid-control-overview)
+   - [Pin Assignments](#pin-assignments)
+3. [Getting Started](#getting-started)
+   - [Prerequisites](#prerequisites)
+   - [Installation & Setup](#installation--setup)
+   - [Hardware Connections](#hardware-connections)
+4. [Usage](#usage)
+   - [Interacting with the System](#interacting-with-the-system)
+   - [Tuning the PID Parameters](#tuning-the-pid-parameters)
+5. [Troubleshooting](#troubleshooting)
+6. [Roadmap](#roadmap)
+7. [Contributing](#contributing)
+8. [License](#license)
+9. [Contact](#contact)
+10. [Acknowledgments](#acknowledgments)
+
+---
+
+## About the Project
+
+The Fan Controller System is designed to control a DC fan’s speed dynamically based on user input, target RPM, or environmental conditions such as temperature. It leverages a PID control loop for closed-loop accuracy and offers multiple modes, including open-loop and automatic (temperature-based) operation.
+
+Whether you need a stable RPM under varying loads, a fan speed that responds to temperature changes, or a manual tuning mode, this controller provides a flexible and extensible solution for embedded applications. It runs on an STM32 NUCLEO-F070RB board, interfacing with an LCD, rotary encoder, temperature sensor, LEDs, and a push button for full standalone operation—no PC required after deployment.
+
+### Key Features
+- **Multiple Control Modes**: Choose between OFF, Closed-Loop RPM control, Open-Loop control, Auto Temperature-based control, and Calibration mode.
+- **PID-based Closed-Loop**: Precisely maintain target RPM under changing conditions.
+- **User-Friendly Interface**: Adjust setpoints with a rotary encoder, view status on an LCD, and use a button to cycle through modes.
+- **Temperature Feedback**: Automatically increase or decrease fan speed to maintain desired temperature.
+- **Dynamic Display & Indicators**: LCD output for RPM, temperature, and mode status, plus LED indicators for quick status checks.
+
+### Built With
+- **C/C++** with Mbed OS
+- **STM32 NUCLEO-F070RB Development Board**
+- **LCD_ST7066U Library**
+- **mRotaryEncoder Library**
+- **PID Controller Library**
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## System Architecture
+
+The firmware continuously reads sensors, updates control parameters, and drives the fan accordingly. It runs in a loop, calling different handlers based on the current mode.
+
+### Control Modes
+- **OFF**: Fan is turned off (0% duty cycle).
+- **Closed-Loop (ENCDR_C_LOOP)**: Uses PID to maintain a user-defined RPM set via the rotary encoder.
+- **Open-Loop (ENCDR_O_LOOP)**: Sets fan speed based on a predetermined duty cycle curve and target RPM input, without feedback correction.
+- **AUTO**: Adjusts fan speed automatically based on the measured temperature, employing a PID-like approach to reach the target temperature.
+- **CALIB**: Attempts to map duty cycle to RPM by stepping down from full speed, useful for characterizing the fan.
+
+### PID Control Overview
+In closed-loop and auto modes, a PID controller adjusts the PWM duty cycle. The parameters `Kc` (Proportional), `tauI` (Integral), and `tauD` (Derivative) can be tuned to optimize system responsiveness and stability.
+
+### Pin Assignments
+
+| Component        | Pins                                  |
+|------------------|---------------------------------------|
+| LCD              | PB_15, PB_14, PB_10, PA_8, PB_2, PB_1 |
+| Rotary Encoder   | PA_1, PA_4                            |
+| Fan PWM Output   | PB_0                                  |
+| Fan Tachometer   | PA_0                                  |
+| LEDs             | PC_0, LED1                            |
+| Button           | BUTTON1                               |
+| Serial Debug     | USBTX, USBRX                          |
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## Getting Started
+
+To run this project locally, follow these steps to set up your environment and hardware.
+
+### Prerequisites
+- Mbed Studio or another Mbed-enabled IDE
+- NUCLEO-F070RB Board
+- External DC fan with tachometer output
+- Rotary encoder
+- LCD compatible with ST7066U
+- Temperature sensor compatible with I2C interface
+- Basic soldering and wiring tools
+
+### Installation & Setup
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/requiem002/ie_cw.git
 
 <!-- USAGE EXAMPLES -->
 ## Usage
