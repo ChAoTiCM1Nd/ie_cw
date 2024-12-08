@@ -67,59 +67,30 @@
 
 ## About the Project
 
-The Fan Controller System is designed to control a DC fan’s speed dynamically based on user input, target RPM, or environmental conditions such as temperature. It leverages a PID control loop for closed-loop accuracy and offers multiple modes, including open-loop and automatic (temperature-based) operation.
+The Fan Controller System is an embedded application that dynamically controls a 12V fan's speed using feedback from sensors and user inputs. It provides multiple control modes, including closed-loop RPM control, open-loop control, and automatic temperature regulation. A calibration mode is also included to map duty cycle to RPM for precise fan characterization. This system is ideal for applications requiring fine control of cooling systems, such as in servers, industrial electronics, or custom PC builds.
 
-Whether you need a stable RPM under varying loads, a fan speed that responds to temperature changes, or a manual tuning mode, this controller provides a flexible and extensible solution for embedded applications. It runs on an STM32 NUCLEO-F070RB board, interfacing with an LCD, rotary encoder, temperature sensor, LEDs, and a push button for full standalone operation—no PC required after deployment.
-
-### Key Features
-- **Multiple Control Modes**: Choose between OFF, Closed-Loop RPM control, Open-Loop control, Auto Temperature-based control, and Calibration mode.
-- **PID-based Closed-Loop**: Precisely maintain target RPM under changing conditions.
-- **User-Friendly Interface**: Adjust setpoints with a rotary encoder, view status on an LCD, and use a button to cycle through modes.
-- **Temperature Feedback**: Automatically increase or decrease fan speed to maintain desired temperature.
-- **Dynamic Display & Indicators**: LCD output for RPM, temperature, and mode status, plus LED indicators for quick status checks.
-
-### Built With
-- ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)
-- **MBED OS**
-- **STM32 NUCLEO-F070RB Development Board**
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+Key highlights include:
+- **Versatile Control Modes**: Adapts to various scenarios with five operating modes.
+- **Feedback & Adjustability**: Real-time feedback through an LCD and LEDs, with adjustable parameters using a rotary encoder.
+- **User-Friendly Interface**: Intuitive operation with a single button to toggle modes and an encoder for setpoint adjustments.
 
 ---
 
-## System Architecture
+## System Overview
 
-<img src="https://github.com/requiem002/ie_cw/blob/master/resources/system_arch.jpg" width=60%>
-The firmware continuously reads sensors, updates control parameters, and drives the fan accordingly. It runs in a loop, calling different handlers based on the current mode.
+This system uses an STM32 NUCLEO-F070RB board, interfacing with:
+- **Fan**: Controlled via PWM.
+- **LCD Display**: Provides real-time information on mode, RPM, and temperature.
+- **Rotary Encoder**: Adjusts target RPM or temperature.
+- **Button**: Toggles between modes.
+- **LEDs**: Indicates status (e.g., RPM range or errors).
 
-
-### System Outline
-- **OFF**: Fan is turned off (0% duty cycle).
-- **Closed-Loop (ENCDR_C_LOOP)**: Uses PID to maintain a user-defined RPM set via the rotary encoder.
-- **Open-Loop (ENCDR_O_LOOP)**: Sets fan speed based on a predetermined duty cycle curve and target RPM input, without feedback correction.
-- **AUTO**: Adjusts fan speed automatically based on the measured temperature, employing a PID-like approach to reach the target temperature.
-- **CALIB**: Attempts to map duty cycle to RPM by stepping down from full speed, useful for characterizing the fan.
-
-
-### Pin Assignments
-
-| Component        | Pins                                  |
-|------------------|---------------------------------------|
-| LCD              | PB_15, PB_14, PB_10, PA_8, PB_2, PB_1 |
-| Rotary Encoder   | PA_1, PA_4                            |
-| Fan PWM Output   | PB_0                                  |
-| Fan Tachometer   | PA_0                                  |
-| LEDs             | PC_0, LED1                            |
-| Button           | BUTTON1                               |
-| Serial Debug     | USBTX, USBRX                          |
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Control Modes
+### Modes of Operation
 
 1. **OFF Mode**:
-   - **Purpose**: Shuts down the fan entirely.
-   - **LED Behavior**: All LEDs are turned off.
+   - **Purpose**: Completely powers off the fan.
+   - **Use Case**: When cooling is unnecessary or to conserve power.
+   - **Operation**: All LEDs are off. The fan PWM is set to 0%.
    - **LCD Output**:
      ```
      M: OFF          
@@ -127,32 +98,45 @@ The firmware continuously reads sensors, updates control parameters, and drives 
      ```
 
 2. **Closed-Loop Control (ENCDR_C_LOOP)**:
-   - **Purpose**: Maintains a user-defined RPM using PID control.
+   - **Purpose**: Maintains a precise RPM using a PID controller.
+   - **Use Case**: Critical applications requiring consistent airflow regardless of load changes.
+   - **Operation**:
+     - User sets the target RPM using the rotary encoder.
+     - PID adjusts the PWM duty cycle to maintain the target RPM.
    - **LED Behavior**:
-     - **Green (PB_7)**: Indicates fan operating at high RPM (>1750).
-     - **Red (PB_7)**: Indicates fan operating at low RPM (<200).
-     - **PC_0 ON**: Indicates fan stall or zero RPM despite duty cycle > 0.
+     - **Red**: Low RPM (<200).
+     - **Green**: High RPM (>1750).
+     - **Off**: Normal operation.
+     - **Green + PC_0 (LED2)**: Indicates a stalled fan.
    - **LCD Output**:
      ```
      M: CL. T= XXXX  (Target RPM)
-     AT=XX. RPM= XXXX (Actual Temperature, RPM)
+     AT=XX. RPM= XXXX (Temperature, Actual RPM)
      ```
 
 3. **Open-Loop Control (ENCDR_O_LOOP)**:
-   - **Purpose**: Controls the fan using predefined duty cycle curves based on the encoder input.
-   - **LED Behavior**: Same as Closed-Loop.
+   - **Purpose**: Controls fan speed using predefined duty cycle curves.
+   - **Use Case**: Non-critical systems where precise RPM is unnecessary.
+   - **Operation**:
+     - Rotary encoder sets target RPM.
+     - Duty cycle is derived from a quadratic equation, without RPM feedback.
+   - **LED Behavior**: Same as Closed-Loop Control.
    - **LCD Output**:
      ```
      M: OL. T= XXXX  (Target RPM)
-     AT=XX. RPM= XXXX (Actual Temperature, RPM)
+     AT=XX. RPM= XXXX (Temperature, Actual RPM)
      ```
 
 4. **Automatic Mode (AUTO)**:
-   - **Purpose**: Adjusts fan speed automatically to maintain a user-defined temperature.
+   - **Purpose**: Adjusts fan speed based on the current temperature to maintain a target temperature.
+   - **Use Case**: Systems requiring thermal regulation, such as server racks.
+   - **Operation**:
+     - Rotary encoder sets the target temperature.
+     - PID controller adjusts the PWM duty cycle based on temperature error.
    - **LED Behavior**:
-     - **Green (PB_7)**: Indicates normal operation.
-     - **Red (PB_7)**: Fan working hard to cool (high duty cycle).
-     - **PC_0 ON**: Indicates the system has engaged a boost mode.
+     - **Red**: High temperature requiring fan boost.
+     - **Green**: Normal temperature.
+     - **PC_0 ON**: Indicates temporary boost to correct temperature quickly.
    - **LCD Output**:
      ```
      M: AL. TT = XX  (Target Temperature)
@@ -160,28 +144,39 @@ The firmware continuously reads sensors, updates control parameters, and drives 
      ```
 
 5. **Calibration Mode (CALIB)**:
-   - **Purpose**: Maps duty cycle to RPM by stepping down from 100%.
-   - **LED Behavior**:
-     - **PC_0 ON**: Calibration in progress.
+   - **Purpose**: Maps the duty cycle to RPM for fan characterization.
+   - **Use Case**: When using a new fan or fine-tuning system performance.
+   - **Operation**:
+     - The fan starts at 100% duty cycle and steps down gradually.
+     - RPM is recorded at each step to create a calibration map.
+     - A loading bar on the LCD shows progress.
+     - LEDs flash alternately during calibration.
    - **LCD Output**:
      ```
-     Calibrating...   
-     [Loading Bar]    
+     Calibrating...  
+     [Loading Bar]   
      ```
+   - **LED Behavior**:
+     - **Alternate Flashing (Red/Green)**: Indicates ongoing calibration.
+
+---
 
 ### LED Behavior
 
-| **Condition**            | **PB_7 (Bi-A)** | **PA_15 (Bi-B)** | **PC_0 (LED 2)** | **Description**                              |
-|--------------------------|----------------|-----------------|-----------------|----------------------------------------------|
-| High RPM (>1750)         | Green          | Red             | OFF             | Fan operating at high RPM.                   |
-| Low RPM (<200)           | Red            | Green           | OFF             | Fan operating at low RPM.                    |
-| Stalled Fan              | OFF            | Green           | ON              | Fan is stalled despite a duty cycle > 0.     |
-| Calibration in Progress  | OFF            | OFF             | ON              | Calibration mode is active.                  |
-| OFF Mode                 | OFF            | OFF             | OFF             | System is off.                               |
+| **Condition**            | **LED (PB_7/PA_15)** | **PC_0 (LED2)** | **Description**                          |
+|--------------------------|----------------------|-----------------|------------------------------------------|
+| High RPM (>1750)         | Green               | OFF             | Normal high-speed operation.             |
+| Low RPM (<200)           | Red                 | OFF             | Normal low-speed operation.              |
+| Stalled Fan              | Red                 | ON              | Fan is stalled despite a duty cycle > 0. |
+| Calibration in Progress  | Alternating Flashing| OFF             | Indicates calibration mode is active.    |
+| OFF Mode                 | OFF                 | OFF             | System is powered off.                   |
+
+---
 
 ### LCD Outputs
 
-The LCD provides real-time information based on the mode. Each mode has a unique output format as described in the "Control Modes" section.
+- **Line 1**: Mode and target (RPM or temperature).
+- **Line 2**: Actual temperature and RPM.
 
 ---
 

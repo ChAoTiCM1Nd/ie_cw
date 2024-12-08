@@ -303,24 +303,35 @@ void handle_closed_loop_ctrl() {
 
          // LED Control based on RPM
     if ((rpm <= 200 && rpm != 0) && (duty_cycle > 0)) {
+
+        //Set Bidirectional LCD to red
         led_bi_A = 0; // red
         led_bi_B = 1; // green
+
         led_2 = 0;    // Turn off other LED
         wait_us(50000);
     } 
     else if (rpm > 1750) {
-        led_bi_A = 1; // green
-        led_bi_B = 0; // red
+
+        //Set Bidirectional LCD to green
+        led_bi_A = 1; 
+        led_bi_B = 0; 
+
         led_2 = 0;    // Turn off other LED
         wait_us(50000);
     } 
     else if ((rpm == 0) && (duty_cycle > 0)){
-        led_bi_A = 0; // red
-        led_bi_B = 1; // green
-        led_2 = 1;    // Turn on another LED (e.g., an indicator LED)
+
+        //Set Bidirectional LCD to red
+        led_bi_A = 0; 
+        led_bi_B = 1; 
+
+        led_2 = 1;    // Turn on second LED 
         wait_us(50000);
     }
     else {
+
+        //Turn off bidirectional LCD
         led_bi_A = 0; // red
         led_bi_B = 0; // off
         led_2 = 0;    // Turn off all LEDs
@@ -385,21 +396,30 @@ void handle_open_loop_ctrl() {
         prev_o_rpm = global_rpm;
 
     if ((global_rpm <= 200 && global_rpm != 0) && (duty_cycle > 0)) {
-        led_bi_A = 0; // red
-        led_bi_B = 1; // green
-        led_2 = 0;    // Turn off other LED
+
+        //Set Bidirectional LCD to red
+        led_bi_A = 0; 
+        led_bi_B = 1; 
+
+        led_2 = 0;    // Turn off second LED
         wait_us(50000);
     } 
     else if (global_rpm > 1750) {
-        led_bi_A = 1; // green
-        led_bi_B = 0; // red
+
+        //Set Bidirectional LCD to green
+        led_bi_A = 1; 
+        led_bi_B = 0; 
+
         led_2 = 0;    // Turn off other LED
         wait_us(50000);
     } 
     else if ((global_rpm == 0) && (duty_cycle > 0)){
-        led_bi_A = 0; // red
-        led_bi_B = 1; // green
-        led_2 = 1;    // Turn on another LED (e.g., an indicator LED)
+
+        //Set Bidirectional LCD to red
+        led_bi_A = 0; 
+        led_bi_B = 1; 
+
+        led_2 = 1;    // Turn on second LED 
         wait_us(50000);
     }
     else {
@@ -522,24 +542,32 @@ void handle_auto_ctrl() {
         safe_lcd_write(buffer_line2, 1); // Write to the second line of the LCD
 
     if ((rpm <= 200 && rpm != 0) && (duty_cycle > 0)) {
-        led_bi_A = 0; // red
-        led_bi_B = 1; // green
-        led_2 = 0;    // Turn off other LED
+
+        //Set Bidirectional LCD to red
+        led_bi_A = 0; 
+        led_bi_B = 1; 
+        led_2 = 0;    // Turn off second LED
         wait_us(50000);
     } 
     else if (rpm > 1750) {
-        led_bi_A = 1; // green
-        led_bi_B = 0; // red
+
+        //Set Bidirectional LCD to green
+        led_bi_A = 1; 
+        led_bi_B = 0; 
+
         led_2 = 0;    // Turn off other LED
         wait_us(50000);
     } 
     else if ((rpm == 0) && (duty_cycle > 0)){
-        led_bi_A = 0; // red
-        led_bi_B = 1; // green
-        led_2 = 1;    // Turn on another LED (e.g., an indicator LED)
+        //Set Bidirectional LCD to red
+        led_bi_A = 0; 
+        led_bi_B = 1; 
+
+        led_2 = 1;    // Turn on second LED, set it to red
         wait_us(50000);
     }
     else {
+        //Set Bidirectional LCD to off
         led_bi_A = 0; // red
         led_bi_B = 0; // off
         led_2 = 0;    // Turn off all LEDs
@@ -589,6 +617,12 @@ void handle_CALI_ctrl() {
     safe_lcd_write("Calibrating...  ", 0);
 
     if (CALIBRATING) {
+
+        
+        if (led_bi_A == 1) led_bi_A = 0; 
+        if (led_bi_B == 0) led_bi_B = 1;
+
+
         
 
         // Update fan speed and wait for stabilization
@@ -607,9 +641,6 @@ void handle_CALI_ctrl() {
         // Update the LCD with the loading bar
         safe_lcd_write(loading_bar, 1);
         
-
-        
-
         wait_us(500000);
         rpm = calculate_rpm(); // Measure RPM
         
