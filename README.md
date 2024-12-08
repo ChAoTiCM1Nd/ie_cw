@@ -93,15 +93,13 @@ Whether you need a stable RPM under varying loads, a fan speed that responds to 
 The firmware continuously reads sensors, updates control parameters, and drives the fan accordingly. It runs in a loop, calling different handlers based on the current mode.
 
 
-### Control Modes
+### System Outline
 - **OFF**: Fan is turned off (0% duty cycle).
 - **Closed-Loop (ENCDR_C_LOOP)**: Uses PID to maintain a user-defined RPM set via the rotary encoder.
 - **Open-Loop (ENCDR_O_LOOP)**: Sets fan speed based on a predetermined duty cycle curve and target RPM input, without feedback correction.
 - **AUTO**: Adjusts fan speed automatically based on the measured temperature, employing a PID-like approach to reach the target temperature.
 - **CALIB**: Attempts to map duty cycle to RPM by stepping down from full speed, useful for characterizing the fan.
 
-### PID Control Overview
-In closed-loop and auto modes, a PID controller adjusts the PWM duty cycle. The parameters `Kc` (Proportional), `tauI` (Integral), and `tauD` (Derivative) can be tuned to optimize system responsiveness and stability.
 
 ### Pin Assignments
 
@@ -117,7 +115,76 @@ In closed-loop and auto modes, a PID controller adjusts the PWM duty cycle. The 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Control Modes
+
+1. **OFF Mode**:
+   - **Purpose**: Shuts down the fan entirely.
+   - **LED Behavior**: All LEDs are turned off.
+   - **LCD Output**:
+     ```
+     M: OFF          
+     [Blank Line]    
+     ```
+
+2. **Closed-Loop Control (ENCDR_C_LOOP)**:
+   - **Purpose**: Maintains a user-defined RPM using PID control.
+   - **LED Behavior**:
+     - **Green (PB_7)**: Indicates fan operating at high RPM (>1750).
+     - **Red (PB_7)**: Indicates fan operating at low RPM (<200).
+     - **PC_0 ON**: Indicates fan stall or zero RPM despite duty cycle > 0.
+   - **LCD Output**:
+     ```
+     M: CL. T= XXXX  (Target RPM)
+     AT=XX. RPM= XXXX (Actual Temperature, RPM)
+     ```
+
+3. **Open-Loop Control (ENCDR_O_LOOP)**:
+   - **Purpose**: Controls the fan using predefined duty cycle curves based on the encoder input.
+   - **LED Behavior**: Same as Closed-Loop.
+   - **LCD Output**:
+     ```
+     M: OL. T= XXXX  (Target RPM)
+     AT=XX. RPM= XXXX (Actual Temperature, RPM)
+     ```
+
+4. **Automatic Mode (AUTO)**:
+   - **Purpose**: Adjusts fan speed automatically to maintain a user-defined temperature.
+   - **LED Behavior**:
+     - **Green (PB_7)**: Indicates normal operation.
+     - **Red (PB_7)**: Fan working hard to cool (high duty cycle).
+     - **PC_0 ON**: Indicates the system has engaged a boost mode.
+   - **LCD Output**:
+     ```
+     M: AL. TT = XX  (Target Temperature)
+     AT=XX. RPM= XXXX (Actual Temperature, RPM)
+     ```
+
+5. **Calibration Mode (CALIB)**:
+   - **Purpose**: Maps duty cycle to RPM by stepping down from 100%.
+   - **LED Behavior**:
+     - **PC_0 ON**: Calibration in progress.
+   - **LCD Output**:
+     ```
+     Calibrating...   
+     [Loading Bar]    
+     ```
+
+### LED Behavior
+
+| **Condition**            | **PB_7 (Bi-A)** | **PA_15 (Bi-B)** | **PC_0 (LED 2)** | **Description**                              |
+|--------------------------|----------------|-----------------|-----------------|----------------------------------------------|
+| High RPM (>1750)         | Green          | Red             | OFF             | Fan operating at high RPM.                   |
+| Low RPM (<200)           | Red            | Green           | OFF             | Fan operating at low RPM.                    |
+| Stalled Fan              | OFF            | Green           | ON              | Fan is stalled despite a duty cycle > 0.     |
+| Calibration in Progress  | OFF            | OFF             | ON              | Calibration mode is active.                  |
+| OFF Mode                 | OFF            | OFF             | OFF             | System is off.                               |
+
+### LCD Outputs
+
+The LCD provides real-time information based on the mode. Each mode has a unique output format as described in the "Control Modes" section.
+
 ---
+
 
 ## Getting Started
 
