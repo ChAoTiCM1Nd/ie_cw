@@ -177,7 +177,7 @@ Build the project in Mbed Studio.
 <br />
 <div align="center">
   <a href="https://github.com/requiem002/ie_cw">
-    <img src="fan.gif" alt="Fan Controller Logo" width="80" height="80">
+    <img src="fan.gif" alt="Fan Controller Logo" width="120" height="120">
   </a>
 
   <h3 align="center">Fan Controller System</h3>
@@ -249,8 +249,9 @@ Whether you need a stable RPM under varying loads, a fan speed that responds to 
 
 ## System Architecture
 
+<img src="https://github.com/requiem002/ie_cw/blob/master/system_arch.jpg" width=60%>
 The firmware continuously reads sensors, updates control parameters, and drives the fan accordingly. It runs in a loop, calling different handlers based on the current mode.
-<img src="https://github.com/requiem002/ie_cw/blob/master/system_arch.jpg" width=40%>
+
 
 ### Control Modes
 - **OFF**: Fan is turned off (0% duty cycle).
