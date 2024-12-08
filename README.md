@@ -30,7 +30,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/github_username/repo_name">
+  <a href="https://github.com/requiem002/ie_cw">
     <img src="fan.gif" alt="Logo" width="80" height="80">
   </a>
 
@@ -39,10 +39,10 @@
   <p align="center">
     project_description
     <br />
-    <a href="https://github.com/requiem002/ie_cw.git"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/requiem002/ie_cw"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/requiem002/ie_cw.git">View Demo</a>
+    <a href="https://github.com/requiem002/ie_cw">View Demo</a>
     ·
     <a href="https://github.com/github_username/repo_name/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     ·
@@ -241,7 +241,7 @@ Don't forget to give the project a star! Thanks again!
 
 ### Top contributors:
 
-<a href="https://github.com/github_username/repo_name/graphs/contributors">
+<a href="https://github.com/requiem002/ie_cw/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=github_username/repo_name" alt="contrib.rocks image" />
 </a>
 
@@ -262,7 +262,7 @@ Distributed under the project_license. See `LICENSE.txt` for more information.
 Saad Ahmed sa2879@bath.ac.uk
 Tom Hunter th____@bath.ac.uk
 
-Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
+Project Link: [https://github.com/requiem002/ie_cw](https://github.com/github_username/repo_name)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
