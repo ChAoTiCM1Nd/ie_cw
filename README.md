@@ -209,19 +209,6 @@ Fine-tune the PID parameters to stabilize the control loop.
 - Check connections to the LCD.
 - Ensure the `LCD_ST7066U` library is properly included and configured.
 ---
-<!-- ROADMAP -->
-## Roadmap
-
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
-
-See the [open issues](https://github.com/requiem002/ie_cw/issues) for a full list of proposed features (and known issues).
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- CONTRIBUTING -->
 ## Contributing
@@ -271,9 +258,13 @@ Project Link: [https://github.com/requiem002/ie_cw](https://github.com/requiem00
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-* []()
-* []()
-* []()
+* **Coursework Guidance**: Thanks to Sanjae King and Professor Despina Moschou for providing the foundational materials and hardware schematics.
+* **Generative AI**: Acknowledgments to ChatGPT by OpenAI, along with Claude Opus by Anthropic for code checking and guidance.
+* **Libraries Used**:
+  - `LCD_ST7066U` library by Luis Rodriguez [https://os.mbed.com/users/luisfrdr/code/LCD_ST7066U/]
+  - `mRotaryEncoder-os` library by Karl Zweimüller [https://os.mbed.com/users/charly/code/mRotaryEncoder-os/]
+  - `PID` library adapted from Brett Beauregard's Arduino PID library.
+This project was developed as part of a coursework activity to build an understanding of programming an embedded processor-based system using C.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
