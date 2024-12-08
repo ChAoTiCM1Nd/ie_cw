@@ -82,6 +82,7 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
+![](https://github.com/ie_cw/fan.gif)
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
 
