@@ -34,7 +34,7 @@
     <img src="fan.gif" alt="Logo" width="80" height="80">
   </a>
 
-<h3 align="center">project_title</h3>
+<h3 align="center">Fan Controller</h3>
 
   <p align="center">
     project_description
@@ -92,18 +92,6 @@ This project implements a software control system for a variable-speed fan using
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-
-### Built With
-
-* [![Next][Next.js]][Next-url]
-* [![React][React.js]][React-url]
-* [![Vue][Vue.js]][Vue-url]
-* [![Angular][Angular.io]][Angular-url]
-* [![Svelte][Svelte.dev]][Svelte-url]
-* [![Laravel][Laravel.com]][Laravel-url]
-* [![Bootstrap][Bootstrap.com]][Bootstrap-url]
-* [![JQuery][JQuery.com]][JQuery-url]
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -122,6 +110,35 @@ This is an example of how to list things you need to use the software and how to
   npm install npm@latest -g
   ```
 
+## System Architecture
+### Main Components
+- **Main Loop**:
+  - Handles mode updates and calls the appropriate control handler based on the current mode.
+- **Control Handlers**:
+  - `handle_off_ctrl()`: Stops the fan.
+  - `handle_open_loop_ctrl()`: Controls fan speed without feedback.
+  - `handle_closed_loop_ctrl()`: Implements PID control for precise RPM maintenance.
+  - `handle_auto_ctrl()`: Adjusts fan speed based on temperature input.
+- **Interrupts**:
+  - **Tachometer Input**: Uses interrupts to count fan pulses for RPM calculation.
+  - **Rotary Encoder**: Reads user input for setting target RPM.
+- **PID Controller**:
+  - Uses a PID library to compute the required duty cycle to maintain the desired RPM.
+  - Parameters (`Kc`, `tauI`, `tauD`) are adjustable for tuning system performance.
+- **RPM Calculation**:
+  - Utilizes microsecond timing for accurate RPM measurements.
+  - Implements timeout logic to reset RPM when the fan stops.
+### Pin Assignments
+| Component           | Pin(s)                        |
+|----------------------|-------------------------------|
+| **LCD**             | PB_15, PB_14, PB_10, PA_8, PB_2, PB_1 |
+| **Rotary Encoder**  | PA_1, PA_4                    |
+| **Fan PWM Output**  | PB_0                          |
+| **Fan Tachometer**  | PA_0                          |
+| **LEDs**            | PC_0, LED1                   |
+| **Button**          | BUTTON1                      |
+| **Serial Debugging**| USBTX, USBRX                 |
+---
 
 ## Installation and Setup
  git clone https://github.com/yourusername/fan-controller-system.git
@@ -159,8 +176,39 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
+## Customization and Tuning
+### PID Parameters
+Adjust the following to fine-tune the closed-loop control response:
+- **Kc**: Proportional gain.
+- **tauI**: Integral time constant.
+- **tauD**: Derivative time constant.
+### Control Loop Timing
+Modify `tSample` to change the control loop interval.
+### RPM Calculation
+- Adjust the number of pulses counted (`pulse_count == 4`) based on the fan's tachometer specifications.
+- Modify debounce timings if necessary.
+---
+## Safety Precautions
+### Power Supply
+Ensure that the power supply voltage matches the fan's rated voltage to prevent damage.
+### Connections
+Double-check all wiring before powering the system to avoid short circuits.
+### Heat Management
+Monitor the temperature of components, especially if running the fan at high speeds for extended periods.
+---
+## Troubleshooting
+### Fan Not Spinning
+- Check the power supply and connections to the fan.
+- Ensure the system is not in **OFF** mode.
+### Incorrect RPM Readings
+- Verify tachometer connections.
+- Ensure the fan's pulses per revolution are correctly configured in the code.
+### Oscillations in Fan Speed
+Fine-tune the PID parameters to stabilize the control loop.
+### No Display on LCD
+- Check connections to the LCD.
+- Ensure the `LCD_ST7066U` library is properly included and configured.
+---
 <!-- ROADMAP -->
 ## Roadmap
 
@@ -211,7 +259,8 @@ Distributed under the project_license. See `LICENSE.txt` for more information.
 <!-- CONTACT -->
 ## Contact
 
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
+Saad Ahmed sa2879@bath.ac.uk
+Tom Hunter th____@bath.ac.uk
 
 Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
 
