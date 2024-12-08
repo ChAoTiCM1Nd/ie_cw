@@ -79,11 +79,8 @@ Whether you need a stable RPM under varying loads, a fan speed that responds to 
 - **Dynamic Display & Indicators**: LCD output for RPM, temperature, and mode status, plus LED indicators for quick status checks.
 
 ### Built With
-- **C/C++** with Mbed OS
+- ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white) with MBED OS
 - **STM32 NUCLEO-F070RB Development Board**
-- **LCD_ST7066U Library**
-- **mRotaryEncoder Library**
-- **PID Controller Library**
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -254,7 +251,7 @@ Project Link: [https://github.com/requiem002/ie_cw](https://github.com/requiem00
   - `LCD_ST7066U` library by Luis Rodriguez [https://os.mbed.com/users/luisfrdr/code/LCD_ST7066U/]
   - `mRotaryEncoder-os` library by Karl Zweimüller [https://os.mbed.com/users/charly/code/mRotaryEncoder-os/]
   - `PID` library adapted from Brett Beauregard's Arduino PID library.
-  
+
 This project was developed as part of a coursework activity to build an understanding of programming an embedded processor-based system using C.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
