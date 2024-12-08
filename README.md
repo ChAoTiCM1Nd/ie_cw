@@ -296,49 +296,86 @@ To run this project locally, follow these steps to set up your environment and h
 1. **Clone the Repository**:
    ```bash
    git clone https://github.com/requiem002/ie_cw.git
+2. ""Open the Project in Mbed Studio""
+   - Launch MBED Studio
+   - Import the cloned folder as an MBED project.
 
-<!-- USAGE EXAMPLES -->
-## Usage
+3. **Install Libraries**:
+   - Ensure all required libraries (`LCD_ST7066U`, `mRotaryEncoder`, `PID`) are included in `mbed_app.json` or imported as libraries.
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+4. ""Compile & Flash""
+    - Connect the NUCLEO board via USB.
+    - Build the project in Mbed Studio.
+    - Drag and drop the compiled `.bin` file onto the NUCLEO drive.
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+---
+
+## Hardware Connections
+
+Refer to the **pin assignment table** above. Connect the fan, tachometer, encoder, LCD, and temperature sensor as indicated. Double-check all wiring before powering on.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Customization and Tuning
-### PID Parameters
-Adjust the following to fine-tune the closed-loop control response:
-- **Kc**: Proportional gain.
-- **tauI**: Integral time constant.
-- **tauD**: Derivative time constant.
-### Control Loop Timing
-Modify `tSample` to change the control loop interval.
-### RPM Calculation
-- Adjust the number of pulses counted (`pulse_count == 4`) based on the fan's tachometer specifications.
-- Modify debounce timings if necessary.
 ---
-## Safety Precautions
-### Power Supply
-Ensure that the power supply voltage matches the fan's rated voltage to prevent damage.
-### Connections
-Double-check all wiring before powering the system to avoid short circuits.
-### Heat Management
-Monitor the temperature of components, especially if running the fan at high speeds for extended periods.
+
+## Usage
+
+Once powered, the LCD will show the current mode. Use the push button to cycle through modes:
+
+- **OFF Mode**: Fan is off.
+- **Closed-Loop Mode**: Turn the rotary encoder to set a target RPM. The PID controller maintains this RPM.
+- **Open-Loop Mode**: Turn the encoder to set a target RPM, but the duty cycle is determined by a predefined curve, not PID feedback.
+- **AUTO Mode**: Turn the encoder to set a target temperature. The fan will speed up or slow down to maintain this temperature.
+- **CALIB Mode**: The system automatically reduces duty cycle from 100% downwards, mapping RPM vs. duty cycle for future reference.
+
 ---
+
+## Interacting with the System
+
+- **Rotary Encoder**: Adjust target RPM or temperature depending on the mode.
+- **Button**: Cycle through the five modes.
+- **LCD & LEDs**: Monitor current RPM, duty cycle, setpoint, and temperature. LED colors and LCD lines help visualize the system state.
+
+---
+
+## Tuning the PID Parameters
+
+- **Kc (Proportional)**: Increases responsiveness. High `Kc` might cause oscillations if too large.
+- **tauI (Integral)**: Helps reduce steady-state error. Increase carefully to avoid overshoot.
+- **tauD (Derivative)**: Helps counteract rapid changes. Too high can introduce noise sensitivity.
+
+Adjust these parameters in the code to achieve the desired performance. Start with small changes and observe fan behavior.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
 ## Troubleshooting
-### Fan Not Spinning
-- Check the power supply and connections to the fan.
-- Ensure the system is not in **OFF** mode.
-### Incorrect RPM Readings
-- Verify tachometer connections.
-- Ensure the fan's pulses per revolution are correctly configured in the code.
-### Oscillations in Fan Speed
-Fine-tune the PID parameters to stabilize the control loop.
-### No Display on LCD
-- Check connections to the LCD.
-- Ensure the `LCD_ST7066U` library is properly included and configured.
+
+- **Fan Not Spinning**:
+  - Check power supply and ensure you’re not in OFF mode.
+- **Incorrect RPM Readings**:
+  - Verify tachometer wiring. Make sure the pulse-per-revolution assumption matches your fan’s specifications.
+- **LCD Not Displaying**:
+  - Confirm LCD pin connections and contrast settings.
+- **Oscillations in Speed**:
+  - Refine PID parameters. Reduce `Kc` or adjust `tauI` and `tauD` as needed.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ---
+
+## Roadmap
+
+- Add EEPROM storage for PID parameters and user preferences.
+- Implement a menu system for switching modes and setting parameters via the encoder.
+- Integrate a more sophisticated temperature sensor for improved accuracy.
+- Add fan fault detection and notifications.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
 
 <!-- CONTRIBUTING -->
 ## Contributing
