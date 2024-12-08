@@ -21,7 +21,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/requiem002/ie_cw">
-    <img src="resources/fan.gif" alt="Fan Controller Logo" width="120" height="120">
+    <img src="resources/fan.gif" alt="Fan Controller Logo" width="160" height="160">
   </a>
 
   <h1 align="center">Fan Controller System</h1>
@@ -79,7 +79,8 @@ Whether you need a stable RPM under varying loads, a fan speed that responds to 
 - **Dynamic Display & Indicators**: LCD output for RPM, temperature, and mode status, plus LED indicators for quick status checks.
 
 ### Built With
-- ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white) with MBED OS
+- ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)
+- **MBED OS**
 - **STM32 NUCLEO-F070RB Development Board**
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
