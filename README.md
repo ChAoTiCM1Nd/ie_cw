@@ -82,7 +82,7 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
-![](https://github.com/ie_cw/fan.gif)
+![](https://github.com/requiem002/ie_cw/blob/provisional_master/fan.gif)
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
 
