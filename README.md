@@ -21,18 +21,16 @@
 <br />
 <div align="center">
   <a href="https://github.com/requiem002/ie_cw">
-    <img src="fan.gif" alt="Fan Controller Logo" width="120" height="120">
+    <img src="resources/fan.gif" alt="Fan Controller Logo" width="120" height="120">
   </a>
 
-  <h3 align="center">Fan Controller System</h3>
+  <h1 align="center">Fan Controller System</h1>
 
   <p align="center">
     A versatile embedded fan control system for precise and automated speed regulation based on user input and environmental conditions.
     <br />
     <a href="https://github.com/requiem002/ie_cw"><strong>Explore the Docs »</strong></a>
     <br />
-    <br />
-    <a href="https://github.com/requiem002/ie_cw">View Demo</a>
     ·
     <a href="https://github.com/requiem002/ie_cw/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     ·
@@ -93,7 +91,7 @@ Whether you need a stable RPM under varying loads, a fan speed that responds to 
 
 ## System Architecture
 
-<img src="https://github.com/requiem002/ie_cw/blob/master/system_arch.jpg" width=60%>
+<img src="https://github.com/requiem002/ie_cw/blob/master/resources/system_arch.jpg" width=60%>
 The firmware continuously reads sensors, updates control parameters, and drives the fan accordingly. It runs in a loop, calling different handlers based on the current mode.
 
 
