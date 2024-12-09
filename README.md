@@ -67,14 +67,53 @@
 
 ## About the Project
 
-The Fan Controller System is an embedded application that dynamically controls a 12V fan's speed using feedback from sensors and user inputs. It provides multiple control modes, including closed-loop RPM control, open-loop control, and automatic temperature regulation. A calibration mode is also included to map duty cycle to RPM for precise fan characterization. This system is ideal for applications requiring fine control of cooling systems, such as in servers, industrial electronics, or custom PC builds.
+The Fan Controller System is designed to control a DC fan’s speed dynamically based on user input, target RPM, or environmental conditions such as temperature. It leverages a PID control loop for closed-loop accuracy and offers multiple modes, including open-loop and automatic (temperature-based) operation.
 
-Key highlights include:
-- **Versatile Control Modes**: Adapts to various scenarios with five operating modes.
-- **Feedback & Adjustability**: Real-time feedback through an LCD and LEDs, with adjustable parameters using a rotary encoder.
-- **User-Friendly Interface**: Intuitive operation with a single button to toggle modes and an encoder for setpoint adjustments.
+Whether you need a stable RPM under varying loads, a fan speed that responds to temperature changes, or a manual tuning mode, this controller provides a flexible and extensible solution for embedded applications. It runs on an STM32 NUCLEO-F070RB board, interfacing with an LCD, rotary encoder, temperature sensor, LEDs, and a push button for full standalone operation—no PC required after deployment.
+
+### Key Features
+- **Multiple Control Modes**: Choose between OFF, Closed-Loop RPM control, Open-Loop control, Auto Temperature-based control, and Calibration mode.
+- **PID-based Closed-Loop**: Precisely maintain target RPM under changing conditions.
+- **User-Friendly Interface**: Adjust setpoints with a rotary encoder, view status on an LCD, and use a button to cycle through modes.
+- **Temperature Feedback**: Automatically increase or decrease fan speed to maintain desired temperature.
+- **Dynamic Display & Indicators**: LCD output for RPM, temperature, and mode status, plus LED indicators for quick status checks.
+
+### Built With
+- ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)
+- **MBED OS**
+- **STM32 NUCLEO-F070RB Development Board**
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ---
+
+## System Architecture
+
+<img src="https://github.com/requiem002/ie_cw/blob/master/resources/system_arch.jpg" width=100%>
+The firmware continuously reads sensors, updates control parameters, and drives the fan accordingly. It runs in a loop, calling different handlers based on the current mode.
+
+
+### System Outline
+- **OFF**: Fan is turned off (0% duty cycle).
+- **Closed-Loop (ENCDR_C_LOOP)**: Uses PID to maintain a user-defined RPM set via the rotary encoder.
+- **Open-Loop (ENCDR_O_LOOP)**: Sets fan speed based on a predetermined duty cycle curve and target RPM input, without feedback correction.
+- **AUTO**: Adjusts fan speed automatically based on the measured temperature, employing a PID-like approach to reach the target temperature.
+- **CALIB**: Attempts to map duty cycle to RPM by stepping down from full speed, useful for characterizing the fan.
+
+
+### Pin Assignments
+
+| Component        | Pins                                  |
+|------------------|---------------------------------------|
+| LCD              | PB_15, PB_14, PB_10, PA_8, PB_2, PB_1 |
+| Rotary Encoder   | PA_1, PA_4                            |
+| Fan PWM Output   | PB_0                                  |
+| Fan Tachometer   | PA_0                                  |
+| LEDs             | PC_0, LED1                            |
+| Button           | BUTTON1                               |
+| Serial Debug     | USBTX, USBRX                          |
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## System Overview
 
@@ -250,11 +289,11 @@ Once powered, the LCD will show the current mode. Use the push button to cycle t
 
 ---
 
-## Roadmap
+## Future Enhancements 
 
 - Add EEPROM storage for PID parameters and user preferences.
 - Implement a menu system for switching modes and setting parameters via the encoder.
-- Integrate a more sophisticated temperature sensor for improved accuracy.
+- Expand the temperature control to include hysteresis.
 - Add fan fault detection and notifications.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
