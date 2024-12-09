@@ -115,6 +115,7 @@ The firmware continuously reads sensors, updates control parameters, and drives 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<!-- System Overview -->
 ## System Overview
 
 This system uses an STM32 NUCLEO-F070RB board, interfacing with:
@@ -202,13 +203,13 @@ This system uses an STM32 NUCLEO-F070RB board, interfacing with:
 
 ### LED Behavior
 
-| **Condition**            | **LED (PB_7/PA_15)** | **PC_0 (LED2)** | **Description**                          |
-|--------------------------|----------------------|-----------------|------------------------------------------|
-| High RPM (>1750)         | Green               | OFF             | Normal high-speed operation.             |
-| Low RPM (<200)           | Red                 | OFF             | Normal low-speed operation.              |
-| Stalled Fan              | Red                 | ON              | Fan is stalled despite a duty cycle > 0. |
-| Calibration in Progress  | Alternating Flashing| OFF             | Indicates calibration mode is active.    |
-| OFF Mode                 | OFF                 | OFF             | System is powered off.                   |
+| **Condition**            | **LED BI (Bidirectional)** |**LED2**         | **Description**                          |
+|--------------------------|----------------------------|-----------------|------------------------------------------|
+| High RPM (>1750)         | Green                      | OFF             | Normal high-speed operation.             |
+| Low RPM (<200)           | Red                        | OFF             | Normal low-speed operation.              |
+| Stalled Fan              | Red                        | ON              | Fan is stalled despite a duty cycle > 0. |
+| Calibration in Progress  | Alternating Flashing       | OFF             | Indicates calibration mode is active.    |
+| OFF Mode                 | OFF                        | OFF             | System is powered off.                   |
 
 ---
 
@@ -219,7 +220,7 @@ This system uses an STM32 NUCLEO-F070RB board, interfacing with:
 
 ---
 
-
+<!-- Getting Started -->
 ## Getting Started
 
 To run this project locally, follow these steps to set up your environment and hardware.
@@ -251,7 +252,7 @@ To run this project locally, follow these steps to set up your environment and h
 
 
 ---
-
+<!-- Usage -->
 ## Usage
 
 Once powered, the LCD will show the current mode. Use the push button to cycle through modes:
@@ -263,15 +264,15 @@ Once powered, the LCD will show the current mode. Use the push button to cycle t
 - **CALIB Mode**: The system automatically reduces duty cycle from 100% downwards, mapping RPM vs. duty cycle for future reference.
 
 ---
-
+<!-- Interacting with the system -->
 ## Interacting with the System
 
 - **Rotary Encoder**: Adjust target RPM or temperature depending on the mode.
 - **Button**: Cycle through the five modes.
-- **LCD & LEDs**: Monitor current RPM, duty cycle, setpoint, and temperature. LED colors and LCD lines help visualize the system state.
+- **LCD & LEDs**: Monitor current RPM, duty cycle, setpoint, and temperature. LED colors and LCD lines help visualize the system state. See LED Behaviour in System Overview for more information.
 
 ---
-
+<!-- Troubleshooting -->
 ## Troubleshooting
 
 - **Fan Not Spinning**:
@@ -288,7 +289,7 @@ Once powered, the LCD will show the current mode. Use the push button to cycle t
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ---
-
+<!-- Future Enhancements -->
 ## Future Enhancements 
 
 - Add EEPROM storage for PID parameters and user preferences.
