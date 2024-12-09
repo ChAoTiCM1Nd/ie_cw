@@ -583,13 +583,13 @@ float calib_dc_step(int rpm) {
     float duty_cycle_step = 0;
 
     if (rpm < 200) {
-        duty_cycle_step = 0.0001f; // Fine adjustments for low RPM
+        duty_cycle_step = 0.005f; // Fine adjustments for low RPM
     } else if (rpm < 300) {
-        duty_cycle_step = 0.0005f; // Fine adjustments for low RPM
+        duty_cycle_step = 0.002f; // Fine adjustments for low RPM
     } else if (rpm < 500) {
-        duty_cycle_step = 0.001f; // Fine adjustments for low RPM
+        duty_cycle_step = 0.0015f; // Fine adjustments for low RPM
     } else if (rpm < 1000) {
-        duty_cycle_step = 0.005f; // Moderate adjustments
+        duty_cycle_step = 0.001f; // Moderate adjustments
     }
     else{
         duty_cycle_step = 0.05;
@@ -618,12 +618,10 @@ void handle_CALI_ctrl() {
 
     if (CALIBRATING) {
 
-        
+
         if (led_bi_A == 1) led_bi_A = 0; 
         if (led_bi_B == 0) led_bi_B = 1;
 
-
-        
 
         // Update fan speed and wait for stabilization
         update_fan_speed(duty_cycle);
@@ -669,8 +667,8 @@ void handle_CALI_ctrl() {
             char buffer[16];
             sprintf(buffer, "Max RPM: %d", calculate_rpm());
             safe_lcd_write(buffer, 0);
-            //sprintf(buffer, "Min RPM: %d", calib_max_rpm);
-            //safe_lcd_write(buffer, 1);
+            sprintf(buffer, "Min RPM: %d", calib_max_rpm);
+            safe_lcd_write(buffer, 1);
 
             printf("Max RPM: %d, MIN RPM: %d", calib_max_rpm, calib_min_rpm);
         }
