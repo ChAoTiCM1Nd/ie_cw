@@ -218,6 +218,11 @@ This system uses an STM32 NUCLEO-F070RB board, interfacing with:
 - **Line 1**: Mode and target (RPM or temperature).
 - **Line 2**: Actual temperature and RPM.
 
+```
+M: XX. T/TT= XXXX  (Mode, Target RPM or Target Temperature)
+AT=XX. RPM= XXXX (Actual Temperature, Actual RPM)
+```
+
 ---
 
 <!-- Getting Started -->
