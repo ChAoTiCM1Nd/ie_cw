@@ -19,7 +19,7 @@ float temp_tSample = 0.1f;    // Sample interval in seconds (e.g., 0.1s for 100m
 const float integral_max = 500.0;
 const float integral_min = -500.0;
 const int MAX_RPM = 1850; // Maximum RPM corresponding to 100% duty cycle
-const float MIN_DUTY_CYCLE = 0.001f;
+const float MIN_DUTY_CYCLE = 0.0001f;
 
 const int starting_rpm = 800;
 
@@ -583,13 +583,13 @@ float calib_dc_step(int rpm) {
     float duty_cycle_step = 0;
 
     if (rpm < 200) {
-        duty_cycle_step = 0.005f; // Fine adjustments for low RPM
+        duty_cycle_step = 0.0025f; // Fine adjustments for low RPM
     } else if (rpm < 300) {
-        duty_cycle_step = 0.002f; // Fine adjustments for low RPM
+        duty_cycle_step = 0.005f; // Fine adjustments for low RPM
     } else if (rpm < 500) {
-        duty_cycle_step = 0.0015f; // Fine adjustments for low RPM
+        duty_cycle_step = 0.0075f; // Fine adjustments for low RPM
     } else if (rpm < 1000) {
-        duty_cycle_step = 0.001f; // Moderate adjustments
+        duty_cycle_step = 0.01f; // Moderate adjustments
     }
     else{
         duty_cycle_step = 0.05;
@@ -612,20 +612,56 @@ void handle_CALI_ctrl() {
     static int calib_max_rpm = 0;
     static int calib_min_rpm = 0;
 
-    static int rpm = 0;
+    static bool led_bi_a_loc = 1;
+    static bool led_bi_b_loc = 0;
 
-    safe_lcd_write("Calibrating...  ", 0);
+    static int rpm = 0;
+    // Display results on the LCD
+    char buffer1[16];
+    char buffer2[16];
+
+    static int prev_rpm = 0;
+
+    rpm = calculate_rpm();
+    static int calib_count = 0;
+    
 
     if (CALIBRATING) {
 
+        if (calib_count == 0)
+        {
+            safe_lcd_write("Calibrating     ", 0);
+        }
+        else if(calib_count == 1)
+        {
+            safe_lcd_write("Calibrating.    ", 0);
+        }
+        else if (calib_count == 2)
+        {
+            safe_lcd_write("Calibrating..   ", 0);
+        }
+        else if (calib_count == 3)
+        {
+            safe_lcd_write("Calibrating...  ", 0);
+        }
+        else if (calib_count > 3)
+        {
+            calib_count = 0;
+        }
 
-        if (led_bi_A == 1) led_bi_A = 0; 
-        if (led_bi_B == 0) led_bi_B = 1;
+    
 
+        calib_count++;
+
+
+        led_bi_A = led_bi_a_loc;
+        led_bi_B = led_bi_b_loc;
+
+        
 
         // Update fan speed and wait for stabilization
         update_fan_speed(duty_cycle);
-        wait_us(4000000);
+        wait_us(4500000);
         
 
         // Update loading bar progress
@@ -638,37 +674,60 @@ void handle_CALI_ctrl() {
 
         // Update the LCD with the loading bar
         safe_lcd_write(loading_bar, 1);
-        
-        wait_us(500000);
-        rpm = calculate_rpm(); // Measure RPM
-        
 
+        
+        
+        //wait_us(500000);
+        rpm = calculate_rpm();
 
         if (duty_cycle == 1.0f) {
             // Display calibration message only at the beginning
             //safe_lcd_write("Calibrating...  ", 0);
+            
+            printf("Waiting at max duty cycle...");
+            wait_us(1000000);
+            rpm = calculate_rpm();
+
             calib_max_rpm = rpm;
         }
+        else {
+        rpm = calculate_rpm(); // Measure RPM
+        }
+        
+
+
+        
 
         duty_cycle_step = calib_dc_step(rpm);
+
+        printf("Duty Cycle: %.3f, RPM: %d, dc_step: %.4f\n", duty_cycle, rpm,duty_cycle_step);
         // Decrease duty cycle
         duty_cycle -= duty_cycle_step;
 
-        printf("Duty Cycle: %.3f, RPM: %d, dc_step: %.4f\n", duty_cycle, rpm,duty_cycle_step);
+        
+
+        led_bi_a_loc = !led_bi_a_loc;
+        led_bi_b_loc = !led_bi_b_loc;
+
+        if (rpm > 0)
+        {
+            prev_rpm = rpm;
+        }
 
         // Check if calibration is complete
-        if (duty_cycle < MIN_DUTY_CYCLE) {
+        if ((duty_cycle < MIN_DUTY_CYCLE) or (rpm == 0)) {
             CALIBRATING = false; // Mark calibration as complete
-
-            calib_min_rpm = rpm;
+            printf("Beep");
+            calib_min_rpm = prev_rpm;
             update_fan_speed(0.0f); // Stop the fan
 
-            // Display results on the LCD
-            char buffer[16];
-            sprintf(buffer, "Max RPM: %d", calculate_rpm());
-            safe_lcd_write(buffer, 0);
-            sprintf(buffer, "Min RPM: %d", calib_max_rpm);
-            safe_lcd_write(buffer, 1);
+            lcd.clear();
+
+
+            sprintf(buffer1, "Max RPM: %d", calib_max_rpm);
+            safe_lcd_write(buffer1, 0);
+            sprintf(buffer2, "Min RPM: %d", calib_min_rpm);
+            safe_lcd_write(buffer2, 1);
 
             printf("Max RPM: %d, MIN RPM: %d", calib_max_rpm, calib_min_rpm);
         }
@@ -678,6 +737,11 @@ void handle_CALI_ctrl() {
     if (!CALIBRATING) {
         // Do nothing; the results will remain on the screen
         ThisThread::sleep_for(10ms); // Add a small delay to reduce CPU load
+
+        rpm = calculate_rpm();
+
+        
+
     }
 }
 
